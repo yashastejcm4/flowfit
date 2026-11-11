@@ -1,40 +1,63 @@
-# Flowfit — Android app
+# Flowfit
 
-Your workout tracker as a real Android app (built with Capacitor).
-Everything lives in `www/` — the same app you've been testing, plus `native-bridge.js` for Android features.
+![Flowfit](docs/cover.jpg)
 
-## What the Android version adds
-- Installs as an app with the Flowfit icon and splash screen (from your F logo)
-- **Back button / back gesture:** closes the open panel → goes to Home → leaves the app
-- **Native vibration** on taps, ticks and saves
-- **Rest timer notification:** "Rest over" pops up even with the phone locked
-- **Status bar** matches the app colours
-- **Data saved to device storage** as a second copy, so it survives a cleared web cache
-- **Groq key** kept in the app's private storage (only this app can read it)
-- Groq Coach, exercise pictures and GIFs work here (the web preview blocks them)
+Flowfit is a workout logging app built for speed. Open it, log your set, put the phone down. It runs as an Android app (built with Capacitor) and works fully offline.
 
-## Option A — Get the APK without installing anything (GitHub, free)
-1. Create a free account at github.com, then click **New repository** → name it `flowfit` → **Private** → Create.
-2. On the empty repo page click **uploading an existing file**, drag in **everything in this folder**
-   (including the hidden `.github` folder — on Windows/Mac drag the folder contents, or use GitHub Desktop).
-3. Click **Commit changes**. Open the **Actions** tab: a "Build Android APK" run starts (about 6–8 minutes).
-4. When it shows a green tick, open the run → **Artifacts** → download **flowfit-apk** (a .zip with `app-debug.apk`).
-5. Send `app-debug.apk` to your phone, tap it, allow "Install unknown apps" for your file manager once, and install.
+## Features
 
-Every time you upload a new version of `www/`, GitHub builds a fresh APK.
+- Today's workout opens automatically from your split
+- Log weight and reps with plus and minus buttons, then tap how the set felt
+- Next-weight suggestions based on your reps and effort
+- Rest timer with a lock-screen notification on Android
+- Training phases (build, progress, push, deload) that set how hard each set should be
+- Import a plan from plain text, like `Bench Press 4x8`
+- Progress charts: estimated 1-rep max, PRs, bodyweight average, sets per muscle
+- Consistency grid and streaks that allow rest days
+- Optional AI coach powered by Groq's free API
+- Backup and restore, plus a second copy saved in Android storage
 
-## Option B — Build on your computer (Android Studio)
-Needs: Node.js 20+ and Android Studio (with Android SDK and JDK 21, both come with it).
+## AI coach and privacy
+
+The coach is optional. To use it, create a free key at [console.groq.com](https://console.groq.com) and paste it in Profile → AI Coach. The key is stored only on your device and is never included in backups. Training data is sent to Groq only when you use a coach feature. Without a key, the app's built-in rules do everything.
+
+Exercise pictures are loaded from public exercise databases when you're online.
+
+## Get the APK
+
+Every push to this repo builds a debug APK with GitHub Actions. Open the **Actions** tab, pick the latest green run and download **flowfit-apk** from Artifacts. Install it on your phone (you'll need to allow installs from unknown sources once).
+
+## Build it yourself
+
+You need Node.js 20+ and Android Studio (it includes the Android SDK and JDK 21).
+
 ```
 npm install
 npx cap add android
 npx capacitor-assets generate --android
 npx cap sync android
-npx cap open android      # Android Studio opens → Build ▸ Build APK(s), or press Run with your phone plugged in
+npx cap open android
 ```
-After changing anything in `www/`, run `npx cap sync android` again.
+
+Then use Build ▸ Build APK(s) in Android Studio, or press Run with your phone plugged in. After changing anything in `www/`, run `npx cap sync android` again.
+
+You can also open `www/index.html` in a browser to try the app, though Android-only features like notifications and haptics won't work there.
+
+## Project structure
+
+```
+www/index.html          The whole app: UI, logic and storage
+www/native-bridge.js    Android features (haptics, notifications, back button, storage)
+assets/                 Icon and splash source images
+capacitor.config.json   App id, name and plugin settings
+.github/workflows/      APK build
+```
 
 ## Notes
-- This is a **debug** build, fine for your own phone. For the Play Store you'd create a signed release build later.
-- First time the rest timer runs, Android asks to allow notifications — tap Allow.
-- On some phones with strict battery saving, the "Rest over" notification can arrive a few seconds late when locked.
+
+- The build is a debug APK, fine for personal use. A Play Store release needs a signed build.
+- On phones with aggressive battery saving, the rest notification can arrive a few seconds late.
+
+## License
+
+[MIT](LICENSE) © Yashas Tej CM
