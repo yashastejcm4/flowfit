@@ -14,7 +14,7 @@ Flowfit is a workout logging app built for speed. Open it, log your set, put the
 - Import a plan from plain text, like `Bench Press 4x8`
 - Progress charts: estimated 1-rep max, PRs, bodyweight average, sets per muscle
 - Consistency grid and streaks that allow rest days
-- Optional AI coach powered by Groq's free API
+- Optional AI coach powered by Groq (free) or Claude — just paste either API key
 - Backup and restore, plus a second copy saved in Android storage
 
 ## AI coach and privacy

@@ -1447,7 +1447,7 @@ function latestSession(){return sorted().at(-1)}
 function reportFor(){const r=C().report,l=latestSession();return r&&l&&r.sid===l.id?r:null}
 function reportCard(){
   const c=C(), l=latestSession();
-  if(!c.on||!getKey()) return `<section class="card coach-cta"><div class="row"><span class="coach-ic">${I('coach',18)}</span><div class="grow"><b>Your coach report</b><div class="sm muted">After every workout, your coach tells you what improved and what to do next week. Add your Groq key to turn it on.</div></div></div><button class="btn btn-primary btn-sm tap" data-a="coachSetup">Set up Coach</button></section>`;
+  if(!c.on||!getKey()) return `<section class="card coach-cta"><div class="row"><span class="coach-ic">${I('coach',18)}</span><div class="grow"><b>Your coach report</b><div class="sm muted">After every workout, your coach tells you what improved and what to do next week. Add your Groq or Claude key to turn it on.</div></div></div><button class="btn btn-primary btn-sm tap" data-a="coachSetup">Set up Coach</button></section>`;
   if(!l) return `<section class="card coach"><div class="coach-head"><span class="coach-ic">${I('coach',18)}</span><div class="grow"><b>Coach report</b><div class="sm muted">Finish your first workout and your coach will write your report here.</div></div></div></section>`;
   const r=reportFor(), when=`${WD[parseISO(l.date).getDay()].slice(0,1)+WD[parseISO(l.date).getDay()].slice(1).toLowerCase()} · ${esc(l.dayName)}`;
   let body;
@@ -1516,8 +1516,13 @@ function pHistory(){
   h+=groups.length?groups.map(g=>`<section class="card"><div class="card-top"><h3>Week of ${fmtD(g.w)}</h3><span class="sm muted tn">${g.list.length} workout${g.list.length>1?'s':''}</span></div><div class="list">${g.list.map(s=>`<button class="li tap" style="width:100%;text-align:left" data-a="openDay" data-d="${s.date}"><div><div class="t">${esc(s.dayName)}</div><div class="s">${WD[parseISO(s.date).getDay()]} ${fmtD(s.date)} · ${sessSets(s)} sets</div></div>${I('chevR',16)}</button>`).join('')}</div></section>`).join(''):`<section class="card empty"><h3>No workouts in this range</h3><p>Saved workouts show up here, grouped by week.</p></section>`;
   return h;
 }
-/* ---------- coach (Groq) ---------- */
+/* ---------- coach (Groq or Claude, picked by key prefix) ---------- */
 const GROQ={url:'https://api.groq.com/openai/v1',models:{smart:'openai/gpt-oss-120b',fast:'openai/gpt-oss-20b'}};
+const CLAUDE={url:'https://api.anthropic.com/v1',models:{smart:'claude-sonnet-5-5',fast:'claude-haiku-5-5'}};
+const isClaudeKey=k=>/^sk-ant-/.test(k||'');
+const isClaude=()=>isClaudeKey(getKey());
+const PROV=()=>isClaude()?'Claude':'Groq';
+const API=()=>isClaude()?CLAUDE:GROQ;
 const KEYK='ironsplit.groqkey';
 const getKey=()=>{try{return localStorage.getItem(KEYK)||''}catch(e){return ''}};
 const setKey=k=>{try{k?localStorage.setItem(KEYK,k):localStorage.removeItem(KEYK)}catch(e){}try{window.__onKey&&window.__onKey(k)}catch(e){}};
@@ -1530,31 +1535,47 @@ let qChain=Promise.resolve();
 function queued(fn){const p=qChain.then(fn,fn);qChain=p.catch(()=>{});return p}
 async function groqFetch(path,body,{signal,stream}={}){
   const key=getKey();
-  if(!key) throw new CoachErr('nokey','Add your Groq key in Profile → AI Coach.');
+  if(!key) throw new CoachErr('nokey','Add your Groq or Claude key in Profile → AI Coach.');
   if(!online()) throw new CoachErr('offline','No connection. Your stats are still up to date.');
   const ctl=new AbortController(), to=setTimeout(()=>ctl.abort('timeout'),stream?60000:25000);
   if(signal){if(signal.aborted)ctl.abort('cancel');else signal.addEventListener('abort',()=>ctl.abort('cancel'))}
   let res;
-  try{res=await fetch(GROQ.url+path,{method:body?'POST':'GET',headers:Object.assign({'Authorization':'Bearer '+key},body?{'Content-Type':'application/json'}:{}),body:body?JSON.stringify(body):undefined,signal:ctl.signal})}
+  const auth=isClaudeKey(key)?{'x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}:{'Authorization':'Bearer '+key};
+  try{res=await fetch(API().url+path,{method:body?'POST':'GET',headers:Object.assign(auth,body?{'Content-Type':'application/json'}:{}),body:body?JSON.stringify(body):undefined,signal:ctl.signal})}
   catch(e){clearTimeout(to);
     if(ctl.signal.aborted&&ctl.signal.reason==='cancel') throw new CoachErr('cancel','Stopped.');
     if(ctl.signal.aborted) throw new CoachErr('timeout','Coach took too long. Try again.');
-    throw new CoachErr('network',inFrame?'Couldn’t reach Groq. This web preview blocks outside connections; Coach works in the Android app.':'Couldn’t reach Groq. Check your connection.')}
+    throw new CoachErr('network',inFrame?`Couldn’t reach ${PROV()}. This web preview blocks outside connections; Coach works in the Android app.`:`Couldn’t reach ${PROV()}. Check your connection.`)}
   if(res.ok){if(!stream)clearTimeout(to);return {res,done:()=>clearTimeout(to)}}
   clearTimeout(to);
   let detail=''; try{detail=(await res.json())?.error?.message||''}catch(e){}
-  if(res.status===401) throw new CoachErr('auth','Your Groq key was rejected. Check it in Profile → AI Coach.');
+  if(res.status===401) throw new CoachErr('auth',`Your ${PROV()} key was rejected. Check it in Profile → AI Coach.`);
   if(res.status===429){const ra=parseFloat(res.headers.get('retry-after')), m=ra?Math.max(1,Math.ceil(ra/60)):0;throw new CoachErr('rate',m?`Coach limit reached. Try again in ${m} min.`:'Coach limit reached. Try again in about a minute.',{wait:ra||60})}
   if(res.status===400) throw new CoachErr('bad','Coach couldn’t answer this time.',{detail});
-  if(res.status===404) throw new CoachErr('model','This Groq model isn’t available on your account. Try the Fast model.',{detail});
-  if(res.status>=500) throw new CoachErr('server','Groq is having trouble. Try again shortly.');
+  if(res.status===404) throw new CoachErr('model',`This ${PROV()} model isn’t available on your account. Try the Fast model.`,{detail});
+  if(res.status>=500) throw new CoachErr('server',`${PROV()} is having trouble. Try again shortly.`);
   throw new CoachErr('other',`Coach request failed (${res.status}).`,{detail});
 }
-const model=()=>GROQ.models[C().model]||GROQ.models.smart;
+const model=()=>API().models[C().model]||API().models.smart;
+/* Claude Messages API: system prompt goes top-level, consecutive same-role turns are merged */
+function toClaude(messages){
+  const system=messages.filter(m=>m.role==='system').map(m=>m.content).join('\n\n'), out=[];
+  messages.filter(m=>m.role!=='system').forEach(m=>{const r=m.role==='assistant'?'assistant':'user';
+    if(out.length&&out.at(-1).role===r)out.at(-1).content+='\n\n'+m.content;else out.push({role:r,content:String(m.content)})});
+  if(!out.length||out[0].role!=='user')out.unshift({role:'user',content:'Go ahead.'});
+  return {system,messages:out};
+}
+const deltaText=j=>isClaude()?(j.type==='content_block_delta'&&j.delta?.type==='text_delta'?j.delta.text:''):j.choices?.[0]?.delta?.content;
 function coachJSON(name,schema,messages,{effort='medium'}={}){
   return queued(async()=>{
     for(let attempt=0;attempt<2;attempt++){
       try{
+        if(isClaude()){
+          const {res}=await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),max_tokens:2500,temperature:0.4,
+            tools:[{name,description:'Return the answer.',input_schema:schema}],tool_choice:{type:'tool',name}}));
+          const j=await res.json(), t=(j.content||[]).find(b=>b.type==='tool_use');
+          if(!t) throw new SyntaxError('no tool output'); return t.input;
+        }
         const {res}=await groqFetch('/chat/completions',{model:model(),messages,temperature:0.4,max_completion_tokens:2500,reasoning_effort:C().model==='fast'?'low':effort,include_reasoning:false,
           response_format:{type:'json_schema',json_schema:{name,strict:true,schema}}});
         const j=await res.json(); return JSON.parse(j?.choices?.[0]?.message?.content||'');
@@ -1569,15 +1590,16 @@ function coachJSON(name,schema,messages,{effort='medium'}={}){
 }
 function coachStream(messages,onText,signal){
   return queued(async()=>{
-    const {res,done}=await groqFetch('/chat/completions',{model:model(),messages,stream:true,temperature:0.6,max_completion_tokens:1500,reasoning_effort:'low',include_reasoning:false},{signal,stream:true});
+    const {res,done}=isClaude()?await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),stream:true,temperature:0.6,max_tokens:1500}),{signal,stream:true})
+      :await groqFetch('/chat/completions',{model:model(),messages,stream:true,temperature:0.6,max_completion_tokens:1500,reasoning_effort:'low',include_reasoning:false},{signal,stream:true});
     let buf='',text='';
-    if(!res.body||!res.body.getReader){const all=await res.text();done();all.split('\n').forEach(l=>{l=l.trim();if(!l.startsWith('data:'))return;const d=l.slice(5).trim();if(d==='[DONE]')return;try{const dl=JSON.parse(d).choices?.[0]?.delta?.content;if(dl)text+=dl}catch(e){}});onText(text);return text}
+    if(!res.body||!res.body.getReader){const all=await res.text();done();all.split('\n').forEach(l=>{l=l.trim();if(!l.startsWith('data:'))return;const d=l.slice(5).trim();if(d==='[DONE]')return;try{const dl=deltaText(JSON.parse(d));if(dl)text+=dl}catch(e){}});onText(text);return text}
     const rd=res.body.getReader(), dec=new TextDecoder();
     try{
       for(;;){const {value,done:end}=await rd.read(); if(end)break; buf+=dec.decode(value,{stream:true}); let i;
         while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
           if(!line.startsWith('data:'))continue; const data=line.slice(5).trim(); if(data==='[DONE]')continue;
-          try{const dl=JSON.parse(data).choices?.[0]?.delta?.content;if(dl){text+=dl;onText(text)}}catch(e){}}}
+          try{const dl=deltaText(JSON.parse(data));if(dl){text+=dl;onText(text)}}catch(e){}}}
     }catch(e){done();if(signal&&signal.aborted)return text;throw new CoachErr('network','The connection dropped. Try again.')}
     done(); return text;
   });
@@ -1700,7 +1722,7 @@ const madeAt=ts=>{const d=new Date(ts);return `${WD[d.getDay()].slice(0,1)+WD[d.
 const offBtn=()=>online()?'':'disabled';
 function coachCard(){
   const c=C(); if(!c.on) return '';
-  if(!getKey()) return c.hidePrompt?'':`<section class="card coach-cta"><div class="row"><span class="coach-ic">${I('coach',18)}</span><div class="grow"><b>Weekly coaching</b><div class="sm muted">Add your Groq key to get advice based on your data.</div></div><button class="link tap" data-a="coachSetup">Set up</button><button class="sq tap" style="width:36px;height:36px" data-a="coachHidePrompt" aria-label="Hide">${I('x',15)}</button></div></section>`;
+  if(!getKey()) return c.hidePrompt?'':`<section class="card coach-cta"><div class="row"><span class="coach-ic">${I('coach',18)}</span><div class="grow"><b>Weekly coaching</b><div class="sm muted">Add your Groq or Claude key to get advice based on your data.</div></div><button class="link tap" data-a="coachSetup">Set up</button><button class="sq tap" style="width:36px;height:36px" data-a="coachHidePrompt" aria-label="Hide">${I('x',15)}</button></div></section>`;
   const wk=weekStart(todayISO()), ci=c.checkin&&c.checkin.week===wk?c.checkin:null, busy=ui.busy.checkin, enough=S.sessions.length>=3;
   let body;
   if(busy) body=`<span class="sm muted">Reading your last 6 weeks…</span>${skel(3)}<div>${skel(2)}</div>`;
@@ -1988,14 +2010,14 @@ function coachSettings(){
   return `<div class="sec" id="coach-settings"><h2>AI Coach</h2>${k?`<span class="badge">Key saved</span>`:''}</div>
   <section class="card" style="gap:10px">
    <div class="set-line"><span>AI Coach</span>${sw('coachToggle',c.on,'AI Coach on or off')}</div>
-   <div class="faint" style="font-size:12px;margin-top:-6px;line-height:1.5">${c.on?(k?'On: Coach plans your sets when you start and decides each next set. The app’s rules step in if Coach is slow or offline.':'On, but needs your Groq key below. Until then the app’s rules run everything.'):'Off: the app’s own rules set targets and adjust every set. Works offline.'}</div>
-   ${c.on?`<div><label class="flabel" for="gkey">Groq API key</label><div class="row"><input id="gkey" class="field grow" type="${ui.showKey?'text':'password'}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="gsk_…" value="${esc(k)}"><button class="sq tap" data-a="keyShow" aria-label="${ui.showKey?'Hide key':'Show key'}">${I('eye',18)}</button></div></div>
+   <div class="faint" style="font-size:12px;margin-top:-6px;line-height:1.5">${c.on?(k?'On: Coach plans your sets when you start and decides each next set. The app’s rules step in if Coach is slow or offline.':'On, but needs your Groq or Claude key below. Until then the app’s rules run everything.'):'Off: the app’s own rules set targets and adjust every set. Works offline.'}</div>
+   ${c.on?`<div><label class="flabel" for="gkey">Groq or Claude API key</label><div class="row"><input id="gkey" class="field grow" type="${ui.showKey?'text':'password'}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="gsk_… or sk-ant-…" value="${esc(k)}"><button class="sq tap" data-a="keyShow" aria-label="${ui.showKey?'Hide key':'Show key'}">${I('eye',18)}</button></div></div>
    <div class="row wrap"><button class="btn btn-primary btn-sm tap" data-a="keySave">Save key</button><button class="btn btn-ghost btn-sm tap" data-a="keyTest" ${k&&!(ks&&ks.kind==='busy')?'':'disabled'}>${ks&&ks.kind==='busy'?'Testing…':'Test key'}</button></div>
    ${ks&&ks.msg?`<span class="sm ${ks.kind==='ok'?'c-lime':ks.kind==='err'?'c-danger':'muted'}">${esc(ks.msg)}</span>`:''}
    <div class="set-line"><div class="sl-t"><span>Coach brain</span><span class="faint">Smart thinks better. Fast replies quicker.</span></div><div class="seg" role="group"><button class="tap" aria-pressed="${c.model==='smart'}" data-a="coachModel" data-v="smart">Smart</button><button class="tap" aria-pressed="${c.model==='fast'}" data-a="coachModel" data-v="fast">Fast</button></div></div>
    <div class="set-line"><div class="sl-t"><span>Share my weight with Coach</span><span class="faint">Helps Coach judge your food and progress</span></div>${sw('coachBody',c.body,'Share my weight with Coach')}</div>
    ${k?(ui.confirm==='rmkey'?`<p class="err">Remove the key? Saved Coach answers and the chat are cleared too.</p><div class="row"><button class="btn btn-sm tap" style="background:var(--danger);color:#fff" data-a="rmKey">Remove key</button><button class="btn btn-ghost btn-sm tap" data-a="cancelConfirm">Keep</button></div>`:`<div><button class="link danger tap" data-a="askRmKey">Remove key</button></div>`):''}
-   <p class="faint" style="margin:0;font-size:12px;line-height:1.5">Get a free key at console.groq.com. Coach sends a short summary of your training to Groq only when you tap a Coach button. Your key stays on this device and is never included in backups.${inFrame?' This web preview can’t connect to Groq; Coach works once the app runs on your phone.':''}</p>`:''}
+   <p class="faint" style="margin:0;font-size:12px;line-height:1.5">Get a free key at console.groq.com, or use a Claude key from console.anthropic.com. Coach sends a short summary of your training to ${PROV()} only when you tap a Coach button. Your key stays on this device and is never included in backups.${inFrame?' This web preview can’t connect to ${PROV()}; Coach works once the app runs on your phone.':''}</p>`:''}
   </section>`;
 }
 function viewProfile(){
@@ -2421,7 +2443,7 @@ const act={
   chatSuggest(d){const i=$('#chatIn');if(i){i.value=d.q;act.chatSend()}},
   chatSend(){
     const inp=$('#chatIn'),q=(inp&&inp.value||'').trim();if(!q||ui.busy.chat)return;
-    if(!coachReady()){toast('Add your Groq key in Profile first');return}
+    if(!coachReady()){toast('Add your Groq or Claude key in Profile first');return}
     const c=C();c.chat.push({role:'user',content:q.slice(0,800)});const last={role:'assistant',content:'',pending:true};c.chat.push(last);
     inp.value='';ui.busy.chat=true;ui.chatCtl=new AbortController();renderSheet();scrollChat();
     const hist=c.chat.filter(m=>!m.pending&&!m.err).slice(-10).map(({role,content})=>({role,content}));
@@ -2438,12 +2460,12 @@ const act={
   coachModel(d){C().model=d.v;render()},
   keyShow(){ui.showKey=!ui.showKey;render()},
   keySave(){const v=($('#gkey')&&$('#gkey').value||'').trim();
-    if(!v){ui.keyStatus={kind:'err',msg:'Paste your Groq API key first.'};render();return}
-    if(!/^gsk_[A-Za-z0-9]{20,}$/.test(v)){ui.keyStatus={kind:'err',msg:'That doesn’t look like a Groq key. Groq keys start with gsk_.'};buzz([10,40,10]);render();return}
+    if(!v){ui.keyStatus={kind:'err',msg:'Paste your Groq or Claude API key first.'};render();return}
+    if(!/^gsk_[A-Za-z0-9]{20,}$/.test(v)&&!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(v)){ui.keyStatus={kind:'err',msg:'That doesn’t look like a Groq or Claude key. Groq keys start with gsk_, Claude keys with sk-ant-.'};buzz([10,40,10]);render();return}
     setKey(v);ui.keyStatus={kind:'info',msg:'Key saved. Tap Test key to check it.'};buzz(15);render();toast('Key saved')},
   async keyTest(){if(!getKey())return;ui.keyStatus={kind:'busy',msg:''};render();
     try{const {res}=await groqFetch('/models');const j=await res.json().catch(()=>({}));const ids=(j.data||[]).map(m=>m.id);
-      const has=ids.includes(GROQ.models.smart);ui.keyStatus={kind:'ok',msg:has||!ids.length?'Connected. Coach is ready.':`Connected, but ${GROQ.models.smart} isn’t on your account. Use the Fast model.`};buzz(20)}
+      const has=ids.includes(API().models.smart);ui.keyStatus={kind:'ok',msg:has||!ids.length?'Connected. Coach is ready.':`Connected, but ${API().models.smart} isn’t on your account. Use the Fast model.`};buzz(20)}
     catch(e){ui.keyStatus={kind:'err',msg:e.message}}
     render()},
   askRmKey(){ui.confirm='rmkey';render()},
