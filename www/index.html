@@ -1551,6 +1551,7 @@ async function groqFetch(path,body,{signal,stream}={}){
   let detail=''; try{detail=(await res.json())?.error?.message||''}catch(e){}
   if(res.status===401) throw new CoachErr('auth',`Your ${PROV()} key was rejected. Check it in Profile → AI Coach.`);
   if(res.status===429){const ra=parseFloat(res.headers.get('retry-after')), m=ra?Math.max(1,Math.ceil(ra/60)):0;throw new CoachErr('rate',m?`Coach limit reached. Try again in ${m} min.`:'Coach limit reached. Try again in about a minute.',{wait:ra||60})}
+  if(isClaudeKey(key)&&res.status!==429&&detail) throw new CoachErr(res.status===401?'auth':res.status===400?'bad':'other','Claude: '+detail.slice(0,200),{detail});
   if(res.status===400) throw new CoachErr('bad','Coach couldn’t answer this time.',{detail});
   if(res.status===404) throw new CoachErr('model',`This ${PROV()} model isn’t available on your account. Try the Fast model.`,{detail});
   if(res.status>=500) throw new CoachErr('server',`${PROV()} is having trouble. Try again shortly.`);
@@ -1571,7 +1572,7 @@ function coachJSON(name,schema,messages,{effort='medium'}={}){
     for(let attempt=0;attempt<2;attempt++){
       try{
         if(isClaude()){
-          const {res}=await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),max_tokens:2500,temperature:0.4,
+          const {res}=await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),max_tokens:2500,
             tools:[{name,description:'Return the answer.',input_schema:schema}],tool_choice:{type:'tool',name}}));
           const j=await res.json(), t=(j.content||[]).find(b=>b.type==='tool_use');
           if(!t) throw new SyntaxError('no tool output'); return t.input;
@@ -1590,7 +1591,7 @@ function coachJSON(name,schema,messages,{effort='medium'}={}){
 }
 function coachStream(messages,onText,signal){
   return queued(async()=>{
-    const {res,done}=isClaude()?await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),stream:true,temperature:0.6,max_tokens:1500}),{signal,stream:true})
+    const {res,done}=isClaude()?await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),stream:true,max_tokens:1500}),{signal,stream:true})
       :await groqFetch('/chat/completions',{model:model(),messages,stream:true,temperature:0.6,max_completion_tokens:1500,reasoning_effort:'low',include_reasoning:false},{signal,stream:true});
     let buf='',text='';
     if(!res.body||!res.body.getReader){const all=await res.text();done();all.split('\n').forEach(l=>{l=l.trim();if(!l.startsWith('data:'))return;const d=l.slice(5).trim();if(d==='[DONE]')return;try{const dl=deltaText(JSON.parse(d));if(dl)text+=dl}catch(e){}});onText(text);return text}
