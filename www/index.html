@@ -188,6 +188,7 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .ex-head .mu{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-top:4px}
 .steppers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stp-l{font-size:12px;color:var(--muted);margin:0 0 6px 4px}
+.stp-inc{font-size:12px;font-weight:600;padding:0;min-height:0;color:var(--accent-fg);text-decoration:underline dotted;text-underline-offset:3px}
 .stp{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;background:var(--surface-2);border-radius:999px;padding:4px}
 .stp button{height:40px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center;color:var(--fg)}
 .stp input{width:100%;min-width:0;background:transparent;border:0;text-align:center;font-size:20px;font-weight:700;padding:0;outline:none;font-variant-numeric:tabular-nums}
@@ -607,7 +608,9 @@ a.btn{text-decoration:none}
 <div id="sheetRoot"></div>
 <div id="toast" aria-live="polite"></div>
 <input type="file" id="fileIn" hidden accept=".txt,.md,text/plain,text/markdown">
+<input type="file" id="bkIn" hidden accept=".json,application/json,text/plain">
 
+<script src="build.js"></script>
 <script>
 /* ---------- utils ---------- */
 const $=s=>document.querySelector(s);
@@ -711,6 +714,25 @@ const r1=v=>Math.round(v*10)/10;
 const fmtW=kg=>{const v=r1(toDisp(kg));return Number.isInteger(v)?String(v):v.toFixed(1)};
 const fmtVol=kg=>{const v=toDisp(kg);return v>=10000?(v/1000).toFixed(1)+'k':Math.round(v).toLocaleString()};
 const stepSize=()=>U()==='lb'?5:2.5;
+/* weight jumps per exercise: a cable stack or machine often moves in 5 or 7 kg steps, not 2.5 */
+const MACHINE_RX=/machine|cable|pulldown|pull-down|pushdown|push-down|pec deck|smith|leg press|extension|stack/i;
+const DB_RX=/dumbbell|\bdb\b|hammer|lateral raise|concentration|kickback/i;
+function incs(){if(!S.inc)S.inc={};return S.inc}
+const incKey=n=>String(n||'').toLowerCase().trim();
+const hasInc=name=>incs()[incKey(name)]!=null;
+const incDefaultKg=name=>MACHINE_RX.test(name||'')&&!DB_RX.test(name||'')?5:2.5;
+/* step for this exercise, in display units */
+function stepFor(name){const v=incs()[incKey(name)];if(v!=null)return r1(toDisp(v));return U()==='lb'?incDefaultKg(name)*2:incDefaultKg(name)}
+/* move a weight (display units) by k steps. A set jump (e.g. 7 kg) adds on top of the current weight; the default snaps to clean numbers */
+function stepFrom(name,cur,dir,k=1){const st=stepFor(name);if(hasInc(name))return Math.max(0,r1(cur+dir*st*k));const v=cur/st,n=dir>0?Math.floor(v+1e-9)+k:Math.ceil(v-1e-9)-k;return Math.max(0,r1(n*st))}
+/* put any weight (display units) on this exercise's real weight steps */
+function snapW(name,w,ref){const st=stepFor(name);if(!(st>0)||!isFinite(w))return w;const base=hasInc(name)&&ref!=null?ref:0;return Math.max(0,r1(base+Math.round((w-base)/st)*st))}
+/* about pct lighter, on real steps (kg in, kg out). If one step is already more than that, keep the weight */
+function lighterKg(name,kg,pct){const st=stepFor(name),cur=r1(toDisp(kg));if(!hasInc(name))return roundStepKg(kg*(1-pct),'down',name);const k=Math.round(cur*pct/st+1e-9);return fromDisp(Math.max(0,r1(cur-k*st)))}
+/* reps you'd likely get at a new weight, from a set you did (Epley) */
+const repsAt=(w,r,nw)=>nw>0?30*(e1rm(w,r)/nw-1):99;
+/* reps to reach at this weight before the next step is a sensible jump: land no lower than ~2 under the range */
+function jumpNeed(name,wD,lo,hi){if(!(wD>0))return hi;const st=stepFor(name),land=Math.max(5,lo-2);return clamp(Math.ceil(30*((wD+st)/wD*(1+land/30)-1)-1e-9),hi,hi+5)}
 
 /* ---------- domain ---------- */
 const sorted=()=>[...S.sessions].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.end||0)-(b.end||0));
@@ -743,7 +765,7 @@ function lastPerf(name,before){
   return null;
 }
 function lastDone(dayId){const s=sorted().reverse().find(x=>x.dayId===dayId);return s?s.date:null}
-function roundStepKg(kg,mode){const st=stepSize(),v=toDisp(kg)/st;const n=mode==='down'?Math.floor(v+1e-9):mode==='up'?Math.ceil(v-1e-9):Math.round(v);return fromDisp(Math.max(0,n*st))}
+function roundStepKg(kg,mode,name){const st=name?stepFor(name):stepSize(),v=toDisp(kg)/st;const n=mode==='down'?Math.floor(v+1e-9):mode==='up'?Math.ceil(v-1e-9):Math.round(v);return fromDisp(Math.max(0,n*st))}
 /* today's target per exercise: double progression, computed on the phone */
 /* ---- program: muscle-building blocks (offline coach brain) ---- */
 const PH={block:{label:'Building'},deload:{label:'Easy week'},steady:{label:'Steady'}};
@@ -774,7 +796,7 @@ const VOL_START={Chest:10,Back:10,Shoulders:8,Biceps:8,Triceps:8,Legs:12,Core:6}
 const VGROUPS=Object.keys(VOL_START);
 function vol(){const p=prog();if(!p.vol)p.vol={...VOL_START};return p.vol}
 const isPrio=m=>prog().priority.includes(m);
-function volTarget(m){const v=vol()[m];if(v==null)return null;const t=v+(isPrio(m)?3:0);return phaseNow().key==='deload'?Math.max(3,Math.round(t/2)):t}
+function volTarget(m){const v=vol()[m];if(v==null||v===0&&!weeklyPlanned(m))return null;const t=v+(isPrio(m)?3:0);return phaseNow().key==='deload'?Math.max(3,Math.round(t/2)):t}
 function weeklyPlanned(m){const days=S.plan.filter(hasEx);if(!days.length)return 0;const per=S.profile.freq/days.length;return days.reduce((t,d)=>t+d.exercises.filter(e=>e.muscle===m).reduce((a,e)=>a+(+e.sets||0),0),0)*per}
 function setsFor(e){const t=volTarget(e.muscle),pl=weeklyPlanned(e.muscle);if(!t||!pl)return Math.max(1,e.sets);return clamp(Math.round(e.sets*t/pl),Math.max(1,e.sets-2),e.sets+1)}
 const doneThisWeek=m=>weekSessions(weekStart(todayISO())).reduce((t,s)=>t+s.exercises.filter(e=>e.muscle===m).reduce((a,e)=>a+e.sets.length,0),0);
@@ -788,6 +810,7 @@ function volTick(){
   const rep=recov().filter(r=>r.date>=prevWs&&r.date<=addDays(prevWs,6)), joint=rep.some(r=>r.joint);
   VGROUPS.forEach(m=>{
     const from=p.vol[m], trained=list.some(s=>s.exercises.some(e=>e.muscle===m)); let to=from, why='';
+    if(from===0&&!trained){p.vol[m]=0;return}
     if(wasDeload||nowBlockStart){to=Math.max(VOL_START[m],Math.round(from*0.8));why='New block: back to a fresh starting point'}
     else if(!trained){why='Not trained last week'}
     else{
@@ -810,17 +833,20 @@ function targetFor(pe){
   if(nw!=null) return {w:nw,r:lo,lo,hi,kind:'coach',why:'Coach suggestion you applied'};
   const L=liftSessions(name);
   if(!L.length) return {w:0,r:lo,lo,hi,kind:'new',why:`First time: pick a weight you can lift for ${reps} reps`};
-  const last=L.at(-1), st=liftStatus(name), stp=stepSize();
-  if(ph==='deload') return {w:roundStepKg(last.w*0.9,'down'),r:lo,lo,hi,kind:'down',why:'Easy week: 10% lighter so you recover and grow'};
-  if(st.key==='dropping'){const w=roundStepKg(last.w*0.9,'down');return {w,r:lo,lo,hi,kind:'down',why:'10% lighter: your last sessions dipped, so rebuild from here'}}
+  const last=L.at(-1), st=liftStatus(name), stp=stepFor(name), u=U();
+  if(ph==='deload'){const w=lighterKg(name,last.w,0.1);return w<last.w-1e-9?{w,r:lo,lo,hi,kind:'down',why:'Easy week: about 10% lighter so you recover and grow'}:{w:last.w,r:lo,lo,hi,kind:'hold',why:`Easy week: one step on this machine (${stp} ${u}) is too big a drop, so same weight and stop at ${lo} reps`}}
+  if(st.key==='dropping'){const w=lighterKg(name,last.w,0.1);return w<last.w-1e-9?{w,r:lo,lo,hi,kind:'down',why:'About 10% lighter: your last sessions dipped, so rebuild from here'}:{w:last.w,r:lo,lo,hi,kind:'hold',why:`Your last sessions dipped. Same weight, aim for ${lo} clean reps`}}
   if(last.w===0){const r=Math.max(lo,Math.min(...last.sets.map(x=>x.r))+1);return {w:0,r,lo,hi,kind:'hold',why:`No added weight: aim for ${r} reps, one more than last time`}}
   const hard=last.sets.some(x=>x.f==='hard'), early=ph==='block'&&phx.wk===1, late=ph==='block'&&phx.rir<=1;
-  if(last.sets.every(x=>x.r>=hi)){
-    if(early&&hard) return {w:last.w,r:hi,lo,hi,kind:'hold',why:'First week of the block: it felt hard, so hold this weight'};
-    return {w:fromDisp(r1(toDisp(last.w))+stp),r:lo,lo,hi,kind:'up',why:`+${stp} ${U()}: you hit ${hi} reps on every set last time`};
+  const atTop=last.sets.filter(x=>x.w>=last.w-1e-9), minR=Math.min(...atTop.map(x=>x.r)), curD=r1(toDisp(last.w)), need=jumpNeed(name,curD,lo,hi), pct=Math.round(stp/curD*100);
+  if(minR>=need){
+    if(early&&hard) return {w:last.w,r:Math.min(need,hi),lo,hi,kind:'hold',why:'First week of the block: it felt hard, so hold this weight'};
+    const nwD=stepFrom(name,curD,1), nr=need>hi?clamp(Math.floor(repsAt(curD,minR,nwD)),Math.max(4,lo-3),hi):lo;
+    return {w:fromDisp(nwD),r:nr,lo,hi,kind:'up',why:need>hi?`+${stp} ${u}, the next step on this machine. That's a ${pct}% jump, so expect about ${nr} reps and build back up`:`+${stp} ${u}: you hit ${hi} reps on every set last time`};
   }
-  const atTop=last.sets.filter(x=>x.w>=last.w-1e-9), r=late?hi:clamp(Math.min(...atTop.map(x=>x.r))+1,lo,hi);
-  return {w:last.w,r,lo,hi,kind:'hold',why:late?`Hard week: same weight, go for ${hi} reps`:`Same weight, aim for ${r} reps (last time ${last.sets.map(x=>x.r).join(', ')})`};
+  const climb=minR+1>=lo?clamp(minR+1,lo,need):Math.max(1,minR+1), r=late?Math.min(need,Math.max(hi,climb)):climb;
+  const big=need>hi&&r>hi;
+  return {w:last.w,r,lo,hi,kind:'hold',why:big?(r>=need?`Same weight, aim for ${r} reps on every set. Hit that and next time it’s +${stp} ${u}`:`Same weight, aim for ${r} reps. The next step is +${stp} ${u} (${pct}% heavier), so build to ${need} reps first`):late?`Hard week: same weight, go for ${r} reps`:`Same weight, aim for ${r} reps (last time ${last.sets.map(x=>x.r).join(', ')})`};
 }
 function buildDraft(dayId){
   const d=S.plan.find(x=>x.id===dayId); if(!d) return null;
@@ -834,19 +860,20 @@ function buildDraft(dayId){
 }
 /* ---- food for growth ---- */
 const nutriOn=()=>S.settings.nutri!==false;
-function nutri(){const b=bodyTrend();if(!b)return null;const kg=b.avg7, cut=(S.profile.train||{}).goal==='cut';
+function nutri(){const b=bodyTrend();if(!b)return null;const kg=b.avg7, gl=(S.profile.train||{}).goal, cut=gl==='cut', rc=gl==='recomp';
   const p=Math.round(kg*1.8),pLo=Math.round(kg*1.6),pHi=Math.round(kg*2.2), pct=b.perWeek==null?null:b.perWeek/kg*100;
   let status=null,msg;
   if(pct==null) msg='Weigh in a few times a week and your pace shows here.';
+  else if(rc){status=pct>0.25?'up':pct<-0.75?'fast':'ok';msg={ok:'Weight steady or slowly dropping while you train hard: that’s how belly fat goes and muscle shows. Keep protein high.',up:'Your weight is climbing. Drop one snack a day to keep losing belly fat.',fast:'Dropping fast. Eat a little more so you keep building muscle.'}[status]}
   else if(cut){status=pct>0.1?'up':pct<-1?'fast':'ok';msg={ok:'Losing at a pace that keeps your muscle.',up:'Your weight is going up. Eat a little less to lose fat.',fast:'Losing fast. Eat a little more so you keep your muscle.'}[status]}
   else{status=pct<-0.05?'losing':pct<0.2?'slow':pct>0.6?'fast':'ok';msg={losing:'You’re losing weight. Muscle grows best when you gain a little: add a snack a day.',slow:'Gaining very slowly. A small extra snack a day helps you grow.',ok:'Gaining at a good pace for muscle.',fast:'Gaining fast, likely some extra fat. Eat a little less.'}[status]}
-  return {kg,p,pLo,pHi,pct,status,msg,cut,gLo:kg*0.0025,gHi:kg*0.005}}
+  return {kg,p,pLo,pHi,pct,status,msg,cut,rc,gLo:kg*0.0025,gHi:kg*0.005}}
 function nutriCtx(){if(!nutriOn())return null;const n=nutri();if(!n)return null;return {proteinGramsPerDay:n.p,weeklyWeightChangePct:n.pct==null?null:Math.round(n.pct*100)/100,status:n.status,proteinHitToday:!!(S.nutri&&S.nutri[todayISO()])}}
 function nutriCard(){if(!nutriOn())return '';const n=nutri();if(!n)return '';const hit=!!(S.nutri&&S.nutri[todayISO()]);
-  return `<section class="card"><div class="card-top"><h3>Food for growth</h3><span class="sm muted">${n.cut?'Losing fat':'Building muscle'}</span></div>
+  return `<section class="card"><div class="card-top"><h3>${n.rc?'Food for a lean look':'Food for growth'}</h3><span class="sm muted">${n.cut?'Losing fat':n.rc?'Lean and fit':'Building muscle'}</span></div>
    <div class="big"><span class="v">${n.p}</span><span class="u">g protein a day</span></div><div class="sm muted" style="margin-top:-6px">Anywhere from ${n.pLo} to ${n.pHi} g works for your weight</div>
    <p class="coach-sum" style="font-size:14.5px">${esc(n.msg)}</p>
-   ${n.cut?'':`<div class="faint" style="font-size:12px;margin-top:-4px">A good pace is about ${fmtW(n.gLo)}–${fmtW(n.gHi)} ${U()} a week.</div>`}
+   ${n.cut||n.rc?'':`<div class="faint" style="font-size:12px;margin-top:-4px">A good pace is about ${fmtW(n.gLo)}–${fmtW(n.gHi)} ${U()} a week.</div>`}
    <button class="btn ${hit?'btn-primary':'btn-ghost'} btn-block tap" data-a="protein" aria-pressed="${hit}">${I('check',18)} ${hit?'Protein done today':'I hit my protein today'}</button></section>`}
 /* ---- weekly sets, check-ins, pump ---- */
 function weekLine(ms){const t=ms.filter(m=>volTarget(m)!=null).map(m=>`${m} ${doneThisWeek(m)}/${volTarget(m)}`);return t.length?`<span class="sm faint">Sets this week: ${esc(t.join(' · '))}</span>`:''}
@@ -914,7 +941,7 @@ function doSwap(inPlan){
 function adjustNext(e,j){
   const s=e.sets[j], tg=e.tg, nx=e.sets.findIndex((x,k)=>k>j&&!x.done);
   if(!tg||nx<0||!s||!s.done||tg.kind==='new'&&s.w===0){delete e.sug;return}
-  const rd=S.active&&S.active.ready||'normal', ph=S.active&&S.active.phase||'block', late=S.active&&S.active.rirBase!=null&&S.active.rirBase<=1, st=stepSize(), cur=r1(toDisp(s.w)), goal=s.r0||tg.r;
+  const rd=S.active&&S.active.ready||'normal', ph=S.active&&S.active.phase||'block', late=S.active&&S.active.rirBase!=null&&S.active.rirBase<=1, st=stepFor(e.name), cur=r1(toDisp(s.w)), goal=s.r0||tg.r;
   const want=s.rir==null?2:s.rir, felt=s.feel?FEEL_RIR[s.feel]-want:null, k=s.strain;
   let dir=null, why='';
   if(k!=null&&k>=80&&s.r<=goal){dir='down';why=`That looked like a real struggle (${s.r} reps)`}
@@ -924,14 +951,25 @@ function adjustNext(e,j){
   else if(rd!=='tired'&&ph!=='deload'&&s.feel!=='hard'&&(s.r-goal>=(rd==='fresh'||late?1:2)||(felt!=null&&felt>=1.5&&s.r>=goal))){dir='up';why=s.r-goal>=1?`You beat the target by ${s.r-goal} rep${s.r-goal>1?'s':''}`:`That felt easy for a “${rirText(want)}” set`}
   }
   if(!dir){delete e.sug;return}
-  let nw=dir==='up'?cur+st:Math.floor(cur*0.95/st+1e-9)*st; if(dir==='down'&&nw>=cur)nw=Math.max(0,cur-st);
   if(dir==='down'&&cur===0){delete e.sug;return}
+  let nw=dir==='up'?stepFrom(e.name,cur,1):hasInc(e.name)?stepFrom(e.name,cur,-1):Math.floor(cur*0.95/st+1e-9)*st; if(dir==='down'&&nw>=cur)nw=stepFrom(e.name,cur,-1);
+  /* a big machine step mid-workout: only go up if you'd still get a sensible number of reps */
+  if(dir==='up'&&repsAt(cur,s.r,nw)<Math.max(5,(tg.lo||goal)-2)){
+    if(s.r>=goal+1){const nr=Math.min(s.r,(tg.hi||goal)+5);e.sug={w:s.w,r:nr,dir:'same',from:j,why:`${why}. The next step (+${st} ${U()}) is too big a jump mid-workout, so stay here and go for ${nr} reps`,src:'app',reps:true}}
+    else delete e.sug;
+    return}
   e.sug={w:fromDisp(nw),dir,from:j,why,src:'app'};
 }
 function commit(a){
-  const exs=a.exercises.filter(e=>!e.skipped).map(e=>({name:e.name,muscle:e.muscle,sets:e.sets.filter(s=>s.done).map(s=>{const o={w:s.w,r:s.r};if(s.feel)o.f=s.feel;if(s.rir!=null)o.t=s.rir;return o})})).filter(e=>e.sets.length);
+  const tgt=t=>t&&{w:t.w,r:t.r,kind:t.kind,why:t.why};
+  const exs=a.exercises.filter(e=>!e.skipped).map(e=>{const o={name:e.name,muscle:e.muscle,sets:e.sets.filter(s=>s.done).map(s=>{const o={w:s.w,r:s.r};if(s.feel)o.f=s.feel;if(s.rir!=null)o.t=s.rir;if(s.r0)o.tr=s.r0;if(s.strain!=null)o.st=s.strain;if(s.bonus)o.x=1;if(s.say)o.c=s.say;if(s.sig)o.sig=s.sig;return o})};
+    if(e.tg)o.target=tgt(e.tg); if(e.tgApp)o.appTarget=tgt(e.tgApp); o.step=stepFor(e.name); return o}).filter(e=>e.sets.length);
   if(!exs.length) return null;
-  const s={id:uid(),date:a.date,dayId:a.dayId,dayName:a.dayName,start:a.started||Date.now(),end:a.date===todayISO()?Date.now():(a.lastAt||a.started||Date.now()),exercises:exs};if(a.pump&&Object.keys(a.pump).length)s.pump={...a.pump};if(a.check)s.check=a.check;
+  const now=Date.now(), last=a.lastAt||a.started||now;
+  /* if Save was tapped long after the last set, end the workout a few minutes after that set */
+  const s={id:uid(),date:a.date,dayId:a.dayId,dayName:a.dayName,start:a.started||now,end:a.date===todayISO()?Math.min(now,last+8*60000):last,exercises:exs};if(a.pump&&Object.keys(a.pump).length)s.pump={...a.pump};if(a.check)s.check=a.check;
+  if(a.ready)s.ready=a.ready; if(a.phase)s.phase=a.phase; if(a.say)s.coachSaid=a.say;
+  const sk=a.exercises.filter(e=>e.skipped).map(e=>e.name); if(sk.length)s.skipped=sk;
   S.sessions.push(s); if(S.nextW) exs.forEach(e=>delete S.nextW[e.name.toLowerCase()]); return s;
 }
 function sync(){
@@ -1172,17 +1210,17 @@ function exCard(e,i){
   const nx=e.sug?e.sets.findIndex((x,k)=>k>e.sug.from&&!x.done):-1;
   let note='';
   if(ui.busy['set:'+e.id]) note=`<div class="note ai"><span class="coach-ic sm">${I('coach',12)}</span>Coach is reading that set…</div>`;
-  else if(e.sug&&nx>=0&&(e.sug.src==='ai'||Math.abs(e.sug.w-e.sets[nx].w)>0.01)) note=`<div class="note ${e.sug.src==='ai'?'ai':e.sug.dir}">${e.sug.src==='ai'?`<span class="coach-ic sm">${I('coach',12)}</span>`:''}<span>${esc(e.sug.why)}</span></div>`;
+  else if(e.sug&&nx>=0&&(e.sug.src==='ai'||Math.abs(e.sug.w-e.sets[nx].w)>0.01||e.sug.reps&&e.sug.r!==e.sets[nx].r)) note=`<div class="note ${e.sug.src==='ai'?'ai':e.sug.dir}">${e.sug.src==='ai'?`<span class="coach-ic sm">${I('coach',12)}</span>`:''}<span>${esc(e.sug.why)}</span></div>`;
   return `<section class="card ex ${all?'allDone':''}" id="ex-${e.id}">
    <div class="ex-head">${mediaThumb(e.name)}<button class="nm exc-main tap" data-a="openEx" data-id="${e.id}" aria-expanded="true"><h3>${esc(e.name)}</h3><span class="mu">${mdot(e.muscle)}${esc(e.muscle)}${lp?` · last ${fmtW(lp.w)} × ${lp.sets.map(x=>x.r).join(',')}`:''}</span></button><button class="link plain tap" data-a="skip" data-i="${i}">Skip</button></div>
    ${targetLine(e,i)}
    <div class="steppers">
-    <div><div class="stp-l">Weight (${U()}) · set ${c+1}</div><div class="stp" id="sw-${e.id}"><button class="tap" data-a="stepW" data-i="${i}" data-d="-1" aria-label="Less weight">${I('minus',18)}</button><input id="w-${e.id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-num="dec" data-c="setW" data-i="${i}" value="${toDisp(s.w).toFixed(1)}" aria-label="Weight for set ${c+1}"><button class="tap" data-a="stepW" data-i="${i}" data-d="1" aria-label="More weight">${I('plus',18)}</button></div></div>
+    <div><div class="stp-l">Weight (${U()}) · set ${c+1} · <button class="link plain tap stp-inc" data-a="openInc" data-n="${esc(e.name)}" aria-label="Weight jump for ${esc(e.name)}: ${stepFor(e.name)} ${U()}. Change">±${stepFor(e.name)}</button></div><div class="stp" id="sw-${e.id}"><button class="tap" data-a="stepW" data-i="${i}" data-d="-1" aria-label="Less weight">${I('minus',18)}</button><input id="w-${e.id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-num="dec" data-c="setW" data-i="${i}" value="${toDisp(s.w).toFixed(1)}" aria-label="Weight for set ${c+1}"><button class="tap" data-a="stepW" data-i="${i}" data-d="1" aria-label="More weight">${I('plus',18)}</button></div></div>
     <div><div class="stp-l">Reps</div><div class="stp" id="sr-${e.id}"><button class="tap" data-a="stepR" data-i="${i}" data-d="-1" aria-label="Fewer reps">${I('minus',18)}</button><input id="r-${e.id}" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="setR" data-i="${i}" value="${s.r}" aria-label="Reps for set ${c+1}"><button class="tap" data-a="stepR" data-i="${i}" data-d="1" aria-label="More reps">${I('plus',18)}</button></div></div>
    </div>
    <div class="sets">${e.sets.map((x,j)=>`<div class="set ${j===c?'cur':''} ${x.done?'done':''}" data-a="pickSet" data-i="${i}" data-j="${j}">
      <span class="n">${x.bonus?'Extra':'Set '+(j+1)}</span><span class="w">${fmtW(x.w)} ${U()} × ${x.r}${x.done?(x.feel?` <span class="feelt">${{easy:'Easy',good:'Good',hard:'Hard'}[x.feel]}</span>`:''):x.rir!=null?` <span class="rir ${x.rir===0?'fail':''}">${rirText(x.rir)}</span>`:''}</span>
-     ${j===nx&&(Math.abs(e.sug.w-x.w)>0.01||e.sug.src==='ai'&&e.sug.r!==x.r)?`<button class="sug ${e.sug.src==='ai'?'ai':e.sug.dir} tap" data-a="useSug" data-i="${i}" aria-label="Use ${fmtW(e.sug.w)} ${U()} for the remaining sets">${e.sug.src==='ai'?'★':e.sug.dir==='up'?'↑':'↓'} ${fmtW(e.sug.w)}${e.sug.src==='ai'?` × ${e.sug.r}`:''}</button>`:'<span></span>'}
+     ${j===nx&&(Math.abs(e.sug.w-x.w)>0.01||(e.sug.src==='ai'||e.sug.reps)&&e.sug.r!==x.r)?`<button class="sug ${e.sug.src==='ai'?'ai':e.sug.dir==='same'?'up':e.sug.dir} tap" data-a="useSug" data-i="${i}" aria-label="Use ${fmtW(e.sug.w)} ${U()} × ${e.sug.r||x.r} for the remaining sets">${e.sug.src==='ai'?'★':e.sug.dir==='up'?'↑':e.sug.dir==='same'?'=':'↓'} ${fmtW(e.sug.w)}${e.sug.src==='ai'||e.sug.reps?` × ${e.sug.r}`:''}</button>`:'<span></span>'}
      <button class="check tap" data-a="tick" data-i="${i}" data-j="${j}" aria-pressed="${x.done}" aria-label="Mark set ${j+1} done">${I('check',18)}</button></div>`).join('')}</div>
    ${note}
    <div class="ex-foot"><button class="link tap" data-a="addSet" data-i="${i}">+ Add set</button>${e.sets.some(x=>x.done)?'':`<button class="link plain tap" data-a="openSwap" data-i="${i}">Swap</button>`}${e.sets.length>1&&!e.sets.at(-1).done?`<button class="link plain tap" data-a="rmSet" data-i="${i}">Remove last</button>`:''}</div>
@@ -1304,7 +1342,7 @@ function viewPlan(){
     <h2 style="font-size:24px;font-weight:700;margin-top:-4px">${esc(d.name)}</h2>
     ${d.exercises.length?`<div class="kv-grid" style="grid-template-columns:repeat(3,1fr)"><div class="kv"><div class="k"><span class="c-orange">${I('flag',14)}</span>Exercises</div><div class="v">${d.exercises.length}</div></div><div class="kv"><div class="k"><span class="c-lime">${I('layers',14)}</span>Sets</div><div class="v">${daySets(d)}</div></div><div class="kv"><div class="k"><span class="c-teal">${I('clock',14)}</span>Time</div><div class="v">~${dayMins(d)}m</div></div></div>
     <div class="row wrap" style="gap:14px">${dayMuscles(d).map(m=>`<span class="sm" style="display:flex;align-items:center;gap:6px">${mdot(m)}${m}</span>`).join('')}</div>`:'<p class="muted" style="margin:0">No exercises yet. Tap Add Exercise below.</p>'}</section>`;
-  h+=d.exercises.map((e,i)=>`<div class="ex-row" id="pe-${e.id}">${mediaThumb(e.name,'pthumb')}<button class="info tap" data-a="editEx" data-i="${i}" aria-label="Edit ${esc(e.name)}"><span class="mu">${mdot(e.muscle)}${esc(e.muscle)}</span><span class="nm">${esc(e.name)}</span><span class="meta">${e.sets} sets · ${repsTxt(e)} reps · ${e.rest||S.settings.rest}s rest</span></button>
+  h+=d.exercises.map((e,i)=>`<div class="ex-row" id="pe-${e.id}">${mediaThumb(e.name,'pthumb')}<button class="info tap" data-a="editEx" data-i="${i}" aria-label="Edit ${esc(e.name)}"><span class="mu">${mdot(e.muscle)}${esc(e.muscle)}</span><span class="nm">${esc(e.name)}</span><span class="meta">${e.sets} sets · ${repsTxt(e)} reps · ${e.rest||S.settings.rest}s rest${hasInc(e.name)?` · ${stepFor(e.name)} ${U()} steps`:''}</span></button>
     <div class="acts"><button class="tap ${e.star?'on':''}" data-a="starEx" data-i="${i}" aria-pressed="${!!e.star}" aria-label="${e.star?'Unstar':'Star as main lift'}">${I('star',18)}</button><button class="tap" data-a="mvEx" data-i="${i}" data-d="-1" ${i===0?'disabled':''} aria-label="Move up">${I('up')}</button><button class="tap" data-a="mvEx" data-i="${i}" data-d="1" ${i===d.exercises.length-1?'disabled':''} aria-label="Move down">${I('down')}</button><button class="tap" data-a="dupEx" data-i="${i}" aria-label="Duplicate">${I('copy',18)}</button><button class="tap" data-a="delEx" data-i="${i}" aria-label="Delete">${I('trash',18)}</button></div></div>`).join('');
   if(coachReady()&&S.plan.some(hasEx)) h+=`<button class="btn btn-line btn-block tap" data-a="openReview">${I('coach',17)} Review my split</button>`;
   return h;
@@ -1442,7 +1480,19 @@ function viewProgress(){
   if(ui.ptab!=='overview') h+=`<div class="row spread"><span class="sm muted">${RANGES[ui.range][0]}</span><div class="range" role="group" aria-label="Time range">${Object.keys(RANGES).map(k=>`<button class="tap" aria-pressed="${ui.range===k}" data-a="prange" data-v="${k}">${k==='all'?'All':k.toUpperCase()}</button>`).join('')}</div></div>`;
   return h+({overview:pOverview,strength:pStrength,body:pBody,history:pHistory}[ui.ptab]||pOverview)();
 }
-function pOverview(){return reportCard()+weekCard()}
+function goalCard(){
+  const g=(S.profile.train||{}).target; if(!g||!g.date) return '';
+  const t=todayISO(), left=diffDays(t,g.date); if(left<-14) return '';
+  const from=g.set&&g.set<g.date?g.set:t, span=Math.max(1,diffDays(from,g.date)), plan=Math.max(1,Math.round(span/7*S.profile.freq));
+  const done=S.sessions.filter(s=>s.date>=from&&s.date<=g.date).length, due=Math.round(plan*clamp(diffDays(from,t)/span,0,1));
+  const ph=phaseNow(), n=nutriOn()?nutri():null;
+  const line=left<0?`Goal date passed. ${done} workouts done since ${fmtD(from)}.`:done>=due?`On track. Keep filling each muscle’s weekly sets${n?` and eat about ${n.p} g protein a day`:''}.`:`${due-done} workout${due-done>1?'s':''} behind. Short sessions still count, so get them in.`;
+  return `<section class="card coach"><div class="card-top"><h3>${esc(g.text||'Your goal')}</h3><span class="sm muted tn">${left>1?`${left} days left`:left===1?'1 day left':left===0?'Today':fmtD(g.date)}</span></div>
+   <div class="big"><span class="v tn">${done}</span><span class="u">of ${plan} workouts by ${fmtD(g.date)}</span></div>
+   <span class="wk-bar" style="display:block"><i style="width:${Math.min(100,Math.round(done/plan*100))}%"></i></span>
+   <span class="sm muted" style="line-height:1.5">${esc(line)}</span>${ph.key==='deload'&&left>=0?`<span class="sm faint">Easy week now: you’ll look fresher and fuller after it.</span>`:''}</section>`;
+}
+function pOverview(){return goalCard()+reportCard()+weekCard()}
 function latestSession(){return sorted().at(-1)}
 function reportFor(){const r=C().report,l=latestSession();return r&&l&&r.sid===l.id?r:null}
 function reportCard(){
@@ -1552,10 +1602,10 @@ async function groqFetch(path,body,{signal,stream}={}){
   if(res.status===401) throw new CoachErr('auth',`Your ${PROV()} key was rejected. Check it in Profile → AI Coach.`);
   if(res.status===429){const ra=parseFloat(res.headers.get('retry-after')), m=ra?Math.max(1,Math.ceil(ra/60)):0;throw new CoachErr('rate',m?`Coach limit reached. Try again in ${m} min.`:'Coach limit reached. Try again in about a minute.',{wait:ra||60})}
   if(isClaudeKey(key)&&res.status!==429&&detail) throw new CoachErr(res.status===401?'auth':res.status===400?'bad':'other','Claude: '+detail.slice(0,200),{detail});
-  if(res.status===400) throw new CoachErr('bad','Coach couldn’t answer this time.',{detail});
+  if(res.status===400) throw new CoachErr('bad',detail?`Groq: ${detail.slice(0,200)}`:'Coach couldn’t answer this time.',{detail});
   if(res.status===404) throw new CoachErr('model',`This ${PROV()} model isn’t available on your account. Try the Fast model.`,{detail});
   if(res.status>=500) throw new CoachErr('server',`${PROV()} is having trouble. Try again shortly.`);
-  throw new CoachErr('other',`Coach request failed (${res.status}).`,{detail});
+  throw new CoachErr('other',`Coach request failed (${res.status})${detail?': '+detail.slice(0,160):''}.`,{detail});
 }
 const model=()=>API().models[C().model]||API().models.smart;
 /* Claude Messages API: system prompt goes top-level, consecutive same-role turns are merged */
@@ -1567,32 +1617,55 @@ function toClaude(messages){
   return {system,messages:out};
 }
 const deltaText=j=>isClaude()?(j.type==='content_block_delta'&&j.delta?.type==='text_delta'?j.delta.text:''):j.choices?.[0]?.delta?.content;
+/* every Coach question and answer is kept (and exported with backups) */
+function clog(o){if(!Array.isArray(S.coachLog))S.coachLog=[];S.coachLog.push({at:Date.now(),date:todayISO(),provider:PROV(),model:model(),...o});if(S.coachLog.length>400)S.coachLog.splice(0,S.coachLog.length-400);save()}
+const askText=messages=>{const u=[...messages].reverse().find(m=>m.role==='user');return u?String(u.content).split('\n\nDATA:')[0].slice(0,1200):''};
+const errObj=e=>({code:e&&e.code||'other',msg:e&&e.message||String(e),detail:e&&e.detail||null});
 function coachJSON(name,schema,messages,{effort='medium'}={}){
   return queued(async()=>{
-    for(let attempt=0;attempt<2;attempt++){
+    let lastErr=null;
+    for(let attempt=0;attempt<3;attempt++){
       try{
+        let out;
         if(isClaude()){
           const {res}=await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),max_tokens:2500,
             tools:[{name,description:'Return the answer.',input_schema:schema}],tool_choice:{type:'tool',name}}));
           const j=await res.json(), t=(j.content||[]).find(b=>b.type==='tool_use');
-          if(!t) throw new SyntaxError('no tool output'); return t.input;
+          if(!t) throw new SyntaxError('no tool output'); out=t.input;
+        }else if(attempt<2){
+          const {res}=await groqFetch('/chat/completions',{model:model(),messages,temperature:0.4,max_completion_tokens:2500,reasoning_effort:C().model==='fast'?'low':effort,include_reasoning:false,
+            response_format:{type:'json_schema',json_schema:{name,strict:true,schema}}});
+          const j=await res.json(); out=JSON.parse(j?.choices?.[0]?.message?.content||'');
+        }else{
+          /* last try: plain JSON mode, no extra settings (works when strict schemas or reasoning settings are refused) */
+          const m2=messages.map(m=>({role:m.role,content:m.content})), u=[...m2].reverse().find(m=>m.role==='user');
+          if(u)u.content+='\n\nReply with only a JSON object that matches this JSON schema:\n'+JSON.stringify(schema);
+          const {res}=await groqFetch('/chat/completions',{model:model(),messages:m2,max_completion_tokens:2500,response_format:{type:'json_object'}});
+          const j=await res.json(), txt=String(j?.choices?.[0]?.message?.content||''), a=txt.indexOf('{'), b=txt.lastIndexOf('}');
+          out=JSON.parse(a>=0&&b>a?txt.slice(a,b+1):txt);
         }
-        const {res}=await groqFetch('/chat/completions',{model:model(),messages,temperature:0.4,max_completion_tokens:2500,reasoning_effort:C().model==='fast'?'low':effort,include_reasoning:false,
-          response_format:{type:'json_schema',json_schema:{name,strict:true,schema}}});
-        const j=await res.json(); return JSON.parse(j?.choices?.[0]?.message?.content||'');
+        clog({kind:name,ask:askText(messages),answer:out,attempt:attempt+1});
+        return out;
       }catch(e){
+        lastErr=e;
         const retry=e instanceof SyntaxError||e.code==='bad';
-        if(attempt===0&&retry) continue;
-        if(e instanceof SyntaxError) throw new CoachErr('bad','Coach couldn’t answer this time.');
-        throw e;
+        if(retry&&attempt<(isClaude()?1:2)) continue;
+        const ce=e instanceof SyntaxError?new CoachErr('bad','Coach couldn’t answer this time.',{detail:String(e.message||e)}):e;
+        if(ce.code!=='cancel')clog({kind:name,ask:askText(messages),error:errObj(ce),attempt:attempt+1});
+        throw ce;
       }
     }
+    throw lastErr;
   });
 }
 function coachStream(messages,onText,signal){
   return queued(async()=>{
-    const {res,done}=isClaude()?await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),stream:true,max_tokens:1500}),{signal,stream:true})
-      :await groqFetch('/chat/completions',{model:model(),messages,stream:true,temperature:0.6,max_completion_tokens:1500,reasoning_effort:'low',include_reasoning:false},{signal,stream:true});
+    let r;
+    if(isClaude()) r=await groqFetch('/messages',Object.assign(toClaude(messages),{model:model(),stream:true,max_tokens:1500}),{signal,stream:true});
+    else try{r=await groqFetch('/chat/completions',{model:model(),messages,stream:true,temperature:0.6,max_completion_tokens:1500,reasoning_effort:'low',include_reasoning:false},{signal,stream:true})}
+      catch(e){if(e.code!=='bad')throw e; /* Groq refused a setting: ask again with the plain request */
+        r=await groqFetch('/chat/completions',{model:model(),messages,stream:true,max_completion_tokens:1500},{signal,stream:true})}
+    const {res,done}=r;
     let buf='',text='';
     if(!res.body||!res.body.getReader){const all=await res.text();done();all.split('\n').forEach(l=>{l=l.trim();if(!l.startsWith('data:'))return;const d=l.slice(5).trim();if(d==='[DONE]')return;try{const dl=deltaText(JSON.parse(d));if(dl)text+=dl}catch(e){}});onText(text);return text}
     const rd=res.body.getReader(), dec=new TextDecoder();
@@ -1608,14 +1681,15 @@ function coachStream(messages,onText,signal){
 const SYS=`You are a strength coach for one lifter inside their personal workout tracking app.
 Rules:
 - Use only numbers that appear in the DATA block. Never invent weights, reps, dates or records. Do not calculate new numbers such as percentages; quote numbers from DATA as they are.
-- Weights are in DATA.units. A weight increase is at most DATA.step per session. A deload is at most 10% below the current top set.
+- Weights are in DATA.units. Each exercise has its own weight step (its "step" field; DATA.step is only the default): machines and cable stacks often move in 5 or 7 kg jumps. Only suggest weights that are the current weight plus or minus whole steps. A weight increase is at most one step per session. When one step is a big jump (over about 10% of the weight), keep the weight and add reps first, up to about 5 above the top of the rep range, before going up. A deload is at most 10% below the current top set; if one step is bigger than that, keep the weight and cut reps or sets instead.
 - Name exercises exactly as they appear in DATA.
 - Plain, direct words. No emoji, no hype, no exclamation marks.
 - If DATA.totalWorkoutsLogged is under 3, say the data is thin and keep advice general.
-- No medical advice. If a lift dropped sharply, suggest rest, and seeing a professional if there is pain.`;
+- No medical advice. If a lift dropped sharply, suggest rest, and seeing a professional if there is pain.
+- Treat profile.protect as a hard limit (an injury or body part to protect): never suggest exercises that load it. If profile.goalDate is set, aim advice at what can be done by that date.`;
 function liftData(name,limit,from){
   const st=liftStatus(name), pe=planEx(name);
-  return {name,muscle:(pe&&pe.muscle)||(st.L.at(-1)||{}).muscle||'Other',status:st.key,repRange:pe?[pe.reps,pe.repsHi||pe.reps]:null,planSets:pe?pe.sets:null,
+  return {name,muscle:(pe&&pe.muscle)||(st.L.at(-1)||{}).muscle||'Other',status:st.key,step:stepFor(name),repRange:pe?[pe.reps,pe.repsHi||pe.reps]:null,planSets:pe?pe.sets:null,
     currentTopSet:st.L.length?[r1(toDisp(st.L.at(-1).w)),st.L.at(-1).r]:null,
     sessions:st.L.filter(x=>!from||x.date>=from).slice(-limit).map(x=>({date:x.date,top:[r1(toDisp(x.w)),x.r],e1rm:r1(toDisp(x.e)),sets:x.sets.map(s=>s.f?[r1(toDisp(s.w)),s.r,s.f]:[r1(toDisp(s.w)),s.r])}))};
 }
@@ -1645,7 +1719,7 @@ const SCH={
   targets:{type:'object',additionalProperties:false,required:['targets'],properties:{targets:{type:'array',items:{type:'object',additionalProperties:false,required:['exercise','weight','reps','reason'],properties:{exercise:{type:'string'},weight:{type:'number'},reps:{type:'integer'},reason:{type:'string'}}}}}},
   review:{type:'object',additionalProperties:false,required:['summary','changes'],properties:{summary:{type:'string'},changes:{type:'array',items:{type:'object',additionalProperties:false,required:['type','day','exercise','value','title','reason'],properties:{type:{type:'string',enum:['add_sets','remove_sets','note']},day:nul('integer'),exercise:nul('string'),value:nul('integer'),title:{type:'string'},reason:{type:'string'}}}}}}
 };
-const ACT_HELP=`Action types: add_weight (value = the new top-set weight, at most DATA.step above currentTopSet), hold (value = the current top-set weight), deload (value = a lighter weight, at most 10% below), add_sets or remove_sets (value = 1 or 2 sets), change_reps (value = the new base reps), swap (exercise = the one to replace; say what to switch to in "title"; value null), recover (exercise null, value null). "title": the action in under 8 words. "reason": one sentence based on DATA.`;
+const ACT_HELP=`Action types: add_weight (value = currentTopSet plus exactly one of that lift's "step"; if that step is a big jump, prefer change_reps or hold), hold (value = the current top-set weight), deload (value = a lighter weight, at most 10% below), add_sets or remove_sets (value = 1 or 2 sets), change_reps (value = the new base reps), swap (exercise = the one to replace; say what to switch to in "title"; value null), recover (exercise null, value null). "title": the action in under 8 words. "reason": one sentence based on DATA.`;
 function numbersOK(text,data){
   const allowed=[]; JSON.stringify(data).replace(/\d+(\.\d+)?/g,m=>{allowed.push(+m);return m});
   return (String(text).match(/\d+(\.\d+)?/g)||[]).map(Number).every(n=>n<=10||allowed.some(a=>Math.abs(a-n)<0.051));
@@ -1654,7 +1728,7 @@ function knownEx(name){if(!name)return null;const n=String(name).toLowerCase().t
 const curTop=name=>{const L=liftSessions(name);return L.length?L.at(-1).w:null};
 function validAction(a,onlyEx){
   if(!a||!ACT_TYPES.includes(a.type)) return null;
-  const st=stepSize(), ex=knownEx(a.exercise), clean=s=>String(s||'').trim().slice(0,160);
+  const ex=knownEx(a.exercise), st=stepFor(ex||a.exercise), clean=s=>String(s||'').trim().slice(0,160);
   if(onlyEx&&a.type!=='recover'&&(!ex||ex.toLowerCase()!==onlyEx.toLowerCase())) return null;
   const base={type:a.type,title:clean(a.title)||a.type,reason:clean(a.reason)};
   switch(a.type){
@@ -1668,8 +1742,10 @@ function validAction(a,onlyEx){
       const cur=toDisp(c), v=a.value, e=0.06;
       if(a.type==='add_weight'&&!(v>cur+0.01&&v<=cur+st+e)) return null;
       if(a.type==='hold'&&Math.abs(v-cur)>e) return null;
-      if(a.type==='deload'&&!(v<cur-0.01&&v>=cur*0.9-e)) return null;
-      return {...base,exercise:ex,value:Math.round(v*100)/100};
+      if(a.type==='deload'&&!(v<cur-0.01&&v>=Math.min(cur*0.9,cur-st)-e)) return null;
+      const sv=a.type==='hold'?r1(cur):snapW(ex,v,r1(cur));
+      if(a.type==='add_weight'&&!(sv>cur+0.01))return null; if(a.type==='deload'&&!(sv<cur-0.01))return null;
+      return {...base,exercise:ex,value:Math.round(sv*100)/100};
     }
   }
 }
@@ -1780,13 +1856,13 @@ function targetsFor(){const a=S.active,t=C().targets;return a&&t&&t.date===today
 function runTargets(){return runCoach('targets',async()=>{
   const a=S.active; if(!a) return;
   const names=a.exercises.filter(e=>!e.skipped).map(e=>e.name), data=coachData({lifts:names,limit:3,weeks:4});
-  const out=await coachJSON('targets',SCH.targets,ask(`Suggest today's working weight and reps for each exercise in DATA.lifts that has sessions. Add weight (one DATA.step) only when the last top set reached the top of repRange; otherwise keep the weight and aim for one more rep. Exercises without sessions: leave them out. "reason": under 8 words.`,data));
-  const st=stepSize(), items=[];
+  const out=await coachJSON('targets',SCH.targets,ask(`Suggest today's working weight and reps for each exercise in DATA.lifts that has sessions. Add weight (one step of that lift, see its "step") only when the last top set reached the top of repRange, or when that step is a big jump, a few reps past it; otherwise keep the weight and aim for one more rep. Exercises without sessions: leave them out. "reason": under 8 words.`,data));
+  const items=[];
   (out.targets||[]).forEach(x=>{const ex=knownEx(x.exercise);if(!ex||!names.includes(ex)||items.some(i=>i.exercise===ex))return;
-    const c=curTop(ex), pe=planEx(ex); if(c==null||typeof x.weight!=='number'||!Number.isInteger(x.reps))return;
-    const cur=toDisp(c); if(!(x.weight>=cur*0.9-0.06&&x.weight<=cur+st+0.06))return;
-    const lo=(pe?pe.reps:x.reps)-2, hi=(pe?(pe.repsHi||pe.reps):x.reps)+2; if(x.reps<Math.max(1,lo)||x.reps>hi)return;
-    items.push({exercise:ex,w:fromDisp(x.weight),r:x.reps,reason:String(x.reason||'').trim().slice(0,80)})});
+    const c=curTop(ex), pe=planEx(ex), st=stepFor(ex); if(c==null||typeof x.weight!=='number'||!Number.isInteger(x.reps))return;
+    const cur=r1(toDisp(c)), w=snapW(ex,x.weight,cur); if(!(w>=Math.min(cur*0.9,cur-st)-0.06&&w<=cur+st+0.06))return;
+    const lo=(pe?pe.reps:x.reps)-3, hi=(pe?(pe.repsHi||pe.reps):x.reps)+5; if(x.reps<Math.max(1,lo)||x.reps>hi)return;
+    items.push({exercise:ex,w:fromDisp(w),r:x.reps,reason:String(x.reason||'').trim().slice(0,80)})});
   if(!items.length) throw new CoachErr('bad','Coach couldn’t suggest targets this time.');
   C().targets={date:todayISO(),dayId:a.dayId,sig:planSig(),items};
 })}
@@ -1814,7 +1890,7 @@ function runWhy(e){
   });
 }
 const aiMode=()=>coachReady();
-function trainCtx(){const t=S.profile.train||{};return {experience:t.exp||null,goal:t.goal||null,usualEffort:t.effort||null,trainsAt:t.where||null,sessionMinutes:t.mins||null,protect:t.protect||null}}
+function trainCtx(){const t=S.profile.train||{},g=t.target;return {experience:t.exp||null,goal:t.goal==='recomp'?'Lean and fit: build muscle and lose belly fat at the same time':t.goal||null,goalDate:g&&g.date||null,daysToGoal:g&&g.date?diffDays(todayISO(),g.date):null,goalLooksLike:g&&g.text||null,usualEffort:t.effort||null,trainsAt:t.where||null,sessionMinutes:t.mins||null,protect:t.protect||null}}
 function phaseCtx(){const ph=phaseNow(),p=prog();return {phase:ph.key==='block'?'Muscle-building block':ph.label,week:ph.wk,weeksInBlock:ph.len,repsInReserveThisWeek:ph.rir,guidance:effortText(ph),mode:p.mode,
   priorityMuscles:p.priority,weeklySets:Object.fromEntries(VGROUPS.map(m=>[m,{target:volTarget(m),doneThisWeek:doneThisWeek(m)}])),lastVolumeChanges:p.volLog&&p.volLog.changes||null,
   recovery:recovCtx(),nutrition:nutriCtx()}}
@@ -1823,11 +1899,11 @@ const SETSYS=`
 The program is built for muscle growth: weekly sets per muscle (weeklySets) are the main driver; reps in reserve start at 3 in week 1 of a block and fall to ~1 by the last week, then an easy week. Sore muscles get fewer sets. Priority muscles come first and get more sets.
 Effort is "reps in reserve": 0 = failure, 1 = one more rep was possible, and so on. Feel after a set: easy ≈ 3+ in reserve, good ≈ 2, hard ≈ 0-1. Respect the phase guidance and the lifter's profile; only use 0 (failure) when failureAllowed is true. Never exceed one weight step up from the last set, never drop more than 10%.`;
 function setCheck(name,w,r,rir,ref){
-  const st=stepSize(), pe=planEx(name)||{reps:r,repsHi:r}, lo=Math.max(1,pe.reps-2), hi=(pe.repsHi||pe.reps)+2;
+  const st=stepFor(name), pe=planEx(name)||{reps:r,repsHi:r}, lo=Math.max(1,pe.reps-3), hi=(pe.repsHi||pe.reps)+5;
   if(typeof w!=='number'||!isFinite(w)||!Number.isInteger(r)||!Number.isInteger(rir)) return false;
   if(r<lo||r>hi||rir<0||rir>5) return false;
   if(rir===0&&!failureOK(name)) return false;
-  return w>=ref*0.9-0.06&&w<=ref+st+0.06&&w>=0;
+  return w>=Math.min(ref*0.9,ref-st)-0.06&&w<=ref+st+0.06&&w>=0;
 }
 /* ---------- AI trainer: plans the session and decides every set ---------- */
 const TRAINER=`\nSignals per set (measured by the app): restTakenSec vs restPlannedSec, restOverrunSec (late start), offAppSec (seconds outside the app during that rest, usually on their phone), inAppTaps, userWeightChange (they changed the suggested weight themselves), strain 0-100 (app estimate: under 30 easy, 30-55 working, 55-78 hard, 78+ struggling), pctOfBest (this set vs their best ever on this lift). A long rest caused mostly by phone time is distraction, not fatigue: keep the plan and, if it keeps happening, gently ask them to keep rest on time. A long rest with little phone time, rising strain, or falling reps means real fatigue: hold or reduce. Session signals show how the whole workout is going.\nYou are standing next to the lifter as their personal trainer during this workout. Decide every set: weight, reps, reps in reserve ("effort", 0 = failure) and rest in seconds. Talk like a calm, experienced trainer: short, direct, encouraging, specific. Effort feel: easy ≈ 3+ reps left, good ≈ 2, hard ≈ 0-1. Respect the phase guidance, the lifter's profile, today's feeling and their chosen focus. Only use effort 0 when failureAllowed is true. Never more than one weight step up from the last set and never more than 15% down. For a first-time exercise pick a conservative starting weight from the profile and similar lifts, then adjust from how the set went.`;
@@ -1845,18 +1921,19 @@ function sessionSignals(){
 function sessCtx(){const a=S.active,b=bodyTrend();return {units:U(),step:stepSize(),profile:trainCtx(),bodyweight:b?r1(toDisp(b.avg7)):null,...phaseCtx(),feelingToday:a&&a.ready||'normal',focus:C().focus?C().focus.label:null}}
 function planCheck(name,w,r,ref){
   if(typeof w!=='number'||!isFinite(w)||w<0||!Number.isInteger(r)||r<1||r>30) return false;
-  const pe=planEx(name), lo=pe?Math.max(1,pe.reps-3):1, hi=pe?(pe.repsHi||pe.reps)+3:30; if(r<lo||r>hi) return false;
+  const pe=planEx(name), st=stepFor(name), lo=pe?Math.max(1,pe.reps-4):1, hi=pe?(pe.repsHi||pe.reps)+5:30; if(r<lo||r>hi) return false;
   if(ref==null){const bw=bodyTrend();const cap=bw?toDisp(bw.avg7)*2.5:300;return w<=cap}
-  return w>=ref*0.85-0.06&&w<=ref+stepSize()+0.06;
+  return w>=Math.min(ref*0.85,ref-st)-0.06&&w<=ref+st+0.06;
 }
-function planData(ex){return {...sessCtx(),exercises:ex.map(e=>{const L=liftSessions(e.name);return {name:e.name,muscle:e.muscle,plannedSets:e.sets.length,repRange:e.tg?[e.tg.lo,e.tg.hi]:null,failureAllowed:failureOK(e.name),firstTime:!L.length,history:L.slice(-4).map(x=>({date:x.date,sets:x.sets.map(s=>s.f?[r1(toDisp(s.w)),s.r,s.f]:[r1(toDisp(s.w)),s.r])}))}})}}
+function planData(ex){return {...sessCtx(),exercises:ex.map(e=>{const L=liftSessions(e.name);return {name:e.name,muscle:e.muscle,step:stepFor(e.name),plannedSets:e.sets.length,repRange:e.tg?[e.tg.lo,e.tg.hi]:null,failureAllowed:failureOK(e.name),firstTime:!L.length,history:L.slice(-4).map(x=>({date:x.date,sets:x.sets.map(s=>s.f?[r1(toDisp(s.w)),s.r,s.f]:[r1(toDisp(s.w)),s.r])}))}})}}
 const SCH_SESSION={type:'object',additionalProperties:false,required:['exercises','say'],properties:{say:{type:'string'},exercises:{type:'array',items:{type:'object',additionalProperties:false,required:['exercise','sets','weight','reps','effort','rest','cue'],properties:{exercise:{type:'string'},sets:{type:'integer'},weight:{type:'number'},reps:{type:'integer'},effort:{type:'array',items:{type:'integer'}},rest:{type:'integer'},cue:{type:'string'}}}}}};
 const planMsgs=(data,ahead)=>[{role:'system',content:SYS+TRAINER},{role:'user',content:`${ahead?'Plan the lifter\'s NEXT session ahead of time (it will be used if they are offline).':'Plan today\'s session.'} For every exercise in DATA.exercises: number of working "sets" (plannedSets ±1), first-set "weight" (DATA.units), "reps", "effort" per set (array, one per set), "rest" seconds between sets (30-300), and "cue" = one coaching tip for this exercise under 14 words. "say" = what you tell the lifter as they start, under 25 words.\n\nDATA:\n`+JSON.stringify(data)}];
 function applyPlan(a,out,data){
   const ex=a.exercises.filter(e=>!e.skipped); let n=0;
   (out.exercises||[]).forEach(p=>{
     const e=ex.find(x=>x.name.toLowerCase()===String(p.exercise||'').toLowerCase()); if(!e||e.sets.some(x=>x.done)) return;
-    const L=liftSessions(e.name), ref=L.length?toDisp(L.at(-1).w):null;
+    const L=liftSessions(e.name), ref=L.length?r1(toDisp(L.at(-1).w)):null;
+    if(typeof p.weight==='number'&&isFinite(p.weight)&&ref!=null)p.weight=snapW(e.name,p.weight,ref);
     if(!planCheck(e.name,p.weight,p.reps,ref)) return;
     const want=clamp(Number.isInteger(p.sets)?p.sets:e.sets.length,Math.max(1,e.sets.length-1),e.sets.length+1);
     while(e.sets.length<want) e.sets.push({w:e.sets.at(-1).w,r:e.sets.at(-1).r,rir:2,done:false});
@@ -1877,7 +1954,7 @@ function runSessionPlan(){
     const out=await coachJSON('session',SCH_SESSION,planMsgs(data,false));
     if(S.active!==a) return;
     if(!applyPlan(a,out,data)) throw new CoachErr('bad','Coach couldn’t plan today. Using the app’s targets.');
-    if(typeof out.say==='string'&&out.say.trim()&&numbersOK(out.say,data)) coachSay(out.say.trim(),null);
+    if(typeof out.say==='string'&&out.say.trim()&&numbersOK(out.say,data)){a.say=out.say.trim().slice(0,200);coachSay(out.say.trim(),null)}
   });
 }
 /* plan the next session right after saving, so Coach still works offline */
@@ -1910,7 +1987,7 @@ function runNextSet(e,j){
   const snap=`${s.w}|${s.r}|${s.feel||''}`, t0=s.doneAt||Date.now(), key='set:'+e.id;
   ui.busy[key]=true; rerender();
   const L=liftSessions(e.name);
-  const data={...sessCtx(),exercise:{name:e.name,muscle:e.muscle,failureAllowed:failureOK(e.name),repRange:e.tg?[e.tg.lo,e.tg.hi]:null,plannedSetsLeft:remaining,extraSetsSoFar:extras,firstTime:!L.length},
+  const data={...sessCtx(),exercise:{name:e.name,muscle:e.muscle,step:stepFor(e.name),failureAllowed:failureOK(e.name),repRange:e.tg?[e.tg.lo,e.tg.hi]:null,plannedSetsLeft:remaining,extraSetsSoFar:extras,firstTime:!L.length},
     today:e.sets.filter(x=>x.done).map((x,k)=>({set:k+1,weight:r1(toDisp(x.w)),reps:x.r,targetReps:x.r0||null,plannedEffort:x.rir,feel:x.feel||null,strain:x.strain??null,pctOfBest:x.pctBest??null,...(x.sig||{})})),
     session:sessionSignals(),
     history:L.slice(-5).map(x=>({date:x.date,sets:x.sets.map(z=>z.f?[r1(toDisp(z.w)),z.r,z.f]:[r1(toDisp(z.w)),z.r])}))};
@@ -1922,6 +1999,8 @@ function runNextSet(e,j){
   .then(out=>{
     if(S.active!==a||!s.done||`${s.w}|${s.r}|${s.feel||''}`!==snap) return;
     const say=typeof out.say==='string'&&numbersOK(out.say,data)?out.say.trim():'';
+    if(say)s.say=say.slice(0,200);
+    if(typeof out.weight==='number'&&isFinite(out.weight))out.weight=snapW(e.name,out.weight,r1(toDisp(s.w)));
     const ok=planCheck(e.name,out.weight,out.reps,r1(toDisp(s.w)))&&Number.isInteger(out.effort)&&out.effort>=0&&out.effort<=5&&(out.effort>0||failureOK(e.name));
     const rest=Number.isInteger(out.rest)?clamp(out.rest,30,300):null;
     const setRest=()=>{if(rest){e.rest=rest;const end=t0+rest*1000;if(end>Date.now()&&ui.restEnd){ui.restTotal=rest*1000;ui.restEnd=end;if(S.active.win)S.active.win.plan=rest*1000}}};
@@ -1981,7 +2060,7 @@ const strengthNames=()=>{const m=mainLifts();return [...m,...exerciseNames().fil
 /* ---------- views: profile ---------- */
 function trainingCards(){
   const t=S.profile.train, p=prog(), ph=phaseNow();
-  const L={exp:{new:'Under 6 months',mid:'6–24 months',adv:'2+ years'},goal:{muscle:'Build muscle',strength:'Get stronger',both:'Muscle and strength',cut:'Lose fat, keep strength'},effort:{easy:'Takes it easy',close:'Close to the limit',failure:'All-out often'},where:{gym:'Full gym',machines:'Mostly machines',home:'Home, dumbbells'}};
+  const L={exp:{new:'Under 6 months',mid:'6–24 months',adv:'2+ years'},goal:{muscle:'Build muscle',strength:'Get stronger',both:'Muscle and strength',cut:'Lose fat, keep strength',recomp:'Lean and fit'},effort:{easy:'Takes it easy',close:'Close to the limit',failure:'All-out often'},where:{gym:'Full gym',machines:'Mostly machines',home:'Home, dumbbells'}};
   const sw=(a,on,label)=>`<button class="sw tap" role="switch" aria-checked="${on}" aria-label="${label}" data-a="${a}"></button>`;
   return `<div class="sec"><h2>About you</h2><button class="link tap" data-a="setupOpen">${t?'Edit':'Set up'}</button></div>
   <section class="card">${t?`<div class="kv-grid">
@@ -2019,6 +2098,7 @@ function coachSettings(){
    <div class="set-line"><div class="sl-t"><span>Share my weight with Coach</span><span class="faint">Helps Coach judge your food and progress</span></div>${sw('coachBody',c.body,'Share my weight with Coach')}</div>
    ${k?(ui.confirm==='rmkey'?`<p class="err">Remove the key? Saved Coach answers and the chat are cleared too.</p><div class="row"><button class="btn btn-sm tap" style="background:var(--danger);color:#fff" data-a="rmKey">Remove key</button><button class="btn btn-ghost btn-sm tap" data-a="cancelConfirm">Keep</button></div>`:`<div><button class="link danger tap" data-a="askRmKey">Remove key</button></div>`):''}
    <p class="faint" style="margin:0;font-size:12px;line-height:1.5">Get a free key at console.groq.com, or use a Claude key from console.anthropic.com. Coach sends a short summary of your training to ${PROV()} only when you tap a Coach button. Your key stays on this device and is never included in backups.${inFrame?' This web preview can’t connect to ${PROV()}; Coach works once the app runs on your phone.':''}</p>`:''}
+   ${(S.coachLog||[]).length?`<button class="btn btn-line btn-block tap" data-a="openLog">${I('chat',17)} Coach history (${S.coachLog.length})</button>`:''}
   </section>`;
 }
 function viewProfile(){
@@ -2050,6 +2130,7 @@ function viewProfile(){
   <div class="sec"><h2>Settings</h2></div>
   <section class="card" style="gap:6px">
    <div class="set-line"><span>Appearance</span>${seg('theme',S.settings.theme,['auto','dark','light'])}</div>
+   ${updLine()}
    <div class="set-line"><span>Units</span>${seg('unit',S.settings.unit,['kg','lb'])}</div>
    <div class="set-line"><span>Workouts per week</span><div class="mini-step"><button class="tap" data-a="freq" data-d="-1" aria-label="Fewer per week">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="freq" value="${p.freq}" aria-label="Workouts per week"><span>×</span></label><button class="tap" data-a="freq" data-d="1" aria-label="More per week">${I('plus',16)}</button></div></div>
    <div class="set-line"><div class="sl-t"><span>Exercise pictures</span><span class="faint">Shows how to do each move (needs internet)</span></div><button class="sw tap" role="switch" aria-checked="${guidesOn()}" aria-label="Exercise pictures" data-a="guidesToggle"></button></div>
@@ -2057,8 +2138,8 @@ function viewProfile(){
   ${trainingCards()}
   ${coachSettings()}
   <div class="sec"><h2>Your data</h2></div>
-  <section class="card"><p class="muted" style="margin:0;line-height:1.5">Saved in this browser on this device. Copy a backup before clearing site data or switching phones.</p>
-   <div class="row wrap"><button class="btn btn-ghost btn-sm tap" data-a="copyBackup">${I('copy',17)} Copy backup</button><button class="btn btn-ghost btn-sm tap" data-a="openRestore">${I('upload',17)} Restore</button></div>
+  <section class="card"><p class="muted" style="margin:0;line-height:1.5">Saved on this device. A backup has everything: your plan, every set, weigh-ins, and every question you asked Coach with its answer. Your API key is never included.</p>
+   <div class="row wrap"><button class="btn btn-ghost btn-sm tap" data-a="saveBackupFile">${I('download',17)} Save backup file</button><button class="btn btn-ghost btn-sm tap" data-a="copyBackup">${I('copy',17)} Copy backup</button><button class="btn btn-ghost btn-sm tap" data-a="openRestore">${I('upload',17)} Restore</button></div>
    <div>${hasDemo?`<button class="btn btn-ghost btn-sm tap" data-a="clearDemo">Remove sample history</button>`:`<button class="btn btn-ghost btn-sm tap" data-a="loadDemo">Load 6 weeks of sample history</button>`}</div>
    ${ui.resetArm?`<p class="err">This deletes your plan, every workout and all weigh-ins.</p><div class="row"><button class="btn btn-sm tap" style="background:var(--danger);color:#fff" data-a="reset">Delete everything</button><button class="btn btn-ghost btn-sm tap" data-a="resetCancel">Cancel</button></div>`:`<div><button class="link danger tap" data-a="resetArm">Reset all data</button></div>`}
   </section>`;
@@ -2089,6 +2170,7 @@ const SHEETS={
      <div><label class="flabel" for="exName">Exercise name</label><input id="exName" class="field" value="${esc(e.name)}" list="exList" autocomplete="off" placeholder="e.g. Bench Press"><datalist id="exList">${exerciseNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
      <div><label class="flabel" for="exMuscle">Muscle group</label><select id="exMuscle" class="field">${MUSCLES.map(m=>`<option ${m===e.muscle?'selected':''}>${m}</option>`).join('')}</select></div>
      <div class="form-grid"><div><label class="flabel" for="exSets">Sets</label><input id="exSets" class="field tn" inputmode="numeric" pattern="[0-9]*" data-num="int" value="${e.sets}"></div><div><label class="flabel" for="exReps">Reps</label><input id="exReps" class="field tn" inputmode="tel" value="${repsTxt(e)}"></div><div><label class="flabel" for="exRest">Rest (s)</label><input id="exRest" class="field tn" inputmode="numeric" pattern="[0-9]*" data-num="int" value="${e.rest||S.settings.rest}"></div></div>
+     <div><label class="flabel" for="exInc">Weight jump (${U()})</label><input id="exInc" class="field tn" inputmode="decimal" data-num="dec" value="${e.name?stepFor(e.name):''}" placeholder="${U()==='lb'?'5':'2.5'} for dumbbells, 5 or 7 for many machines"><div class="faint" style="font-size:12px;margin-top:6px">The smallest step this machine or rack goes up by.</div></div>
      <p class="err" id="exErr" hidden></p>
      <button class="btn btn-primary btn-block tap" data-a="saveEx">${isNew?'Add to Day '+(ui.planDay+1):'Save changes'}</button>
      ${isNew?'':`<button class="btn btn-ghost btn-block tap" data-a="delEx" data-i="${ui.editEx}">Delete exercise</button>`}</div>`;
@@ -2157,7 +2239,8 @@ const SHEETS={
      <div class="brand-hero">${logoMark(64)}</div>
      <p class="muted" style="margin:0;line-height:1.5;text-align:center">A few answers so targets fit you. Change them any time in Profile.</p>
      ${grp('exp','How long have you been lifting?',[['new','Under 6 months'],['mid','6–24 months'],['adv','2+ years']])}
-     ${grp('goal','Main goal',[['muscle','Build muscle'],['strength','Get stronger'],['both','Both'],['cut','Lose fat, keep strength']])}
+     ${grp('goal','Main goal',[['muscle','Build muscle'],['strength','Get stronger'],['both','Both'],['cut','Lose fat, keep strength'],['recomp','Lean and fit','Build muscle, lose belly fat']])}
+     <div class="form-grid" style="grid-template-columns:1fr 1.4fr"><div><label class="flabel" for="setupGoalDate">Goal date (optional)</label><input id="setupGoalDate" class="field tn" type="date" value="${esc(t.goalDate||'')}"></div><div><label class="flabel" for="setupGoalText">What does done look like?</label><input id="setupGoalText" class="field" maxlength="80" placeholder="e.g. Look fit in a t-shirt" value="${esc(t.goalText||'')}"></div></div>
      ${grp('effort','How hard do you train now?',[['easy','Stop well before it gets hard'],['close','Go close to my limit'],['failure','Go to failure often']])}
      ${grp('where','Where do you train?',[['gym','Full gym'],['machines','Mostly machines'],['home','Home, dumbbells']])}
      ${grp('mins','Session length',[['45','45 min'],['60','60 min'],['90','90 min']])}
@@ -2167,8 +2250,23 @@ const SHEETS={
      <button class="btn btn-primary btn-block tap" data-a="setupSave">Save</button>
      <button class="link plain tap" data-a="setupLater">${S.profile.train?'Cancel':'Later'}</button></div>`;
   },
-  backup(){return sheetHead('Backup','Copy this text')+`<div class="sheet-body"><p class="muted" style="margin:0">Your browser blocked automatic copying. Select all of the text below and copy it somewhere safe.</p><textarea id="bkText" class="field" readonly>${esc(JSON.stringify(S))}</textarea></div>`},
-  restore(){return sheetHead('Backup','Restore data')+`<div class="sheet-body"><label class="flabel" for="rsText">Paste a backup</label><textarea id="rsText" class="field" placeholder="{&quot;v&quot;:1,…}"></textarea><p class="err" id="rsErr" hidden></p><p class="muted" style="margin:0">Restoring replaces everything currently in the app.</p><button class="btn btn-primary btn-block tap" data-a="restore">Replace with backup</button></div>`}
+  coachlog(){
+    const L=(S.coachLog||[]).slice().reverse().slice(0,150);
+    const KIND={chat:'You asked',checkin:'Weekly check-in',fix:'Fix for a lift',recap:'Workout recap',targets:'Today’s targets',review:'Split review',why:'Why this target',session:'Session plan',trainer:'Set decision',report:'Coach report'};
+    const flat=v=>typeof v==='string'||typeof v==='number'?String(v):Array.isArray(v)?v.map(flat).filter(Boolean).join('\n'):v&&typeof v==='object'?Object.entries(v).filter(([k])=>!['effort','rest'].includes(k)).map(([,x])=>flat(x)).filter(Boolean).join(' · '):'';
+    const when=x=>{const d=new Date(x.at);return `${x.date?fmtD(x.date):''} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+    return sheetHead('AI Coach','Coach history')+`<div class="sheet-body">
+     <p class="muted" style="margin:0;line-height:1.5">Everything you asked Coach and everything it answered, newest first. It’s all included when you save a backup.</p>
+     ${L.length?L.map(x=>`<div class="act"><div class="row spread"><span class="ty">${esc(KIND[x.kind]||x.kind)}</span><span class="sm faint tn">${esc(when(x))}</span></div>
+       ${x.kind==='chat'?`<b style="font-size:15px">${esc(x.ask)}</b>`:''}
+       ${x.error?`<span class="sm c-danger" style="line-height:1.45">${esc(x.error.msg)}${x.error.detail&&!String(x.error.msg).includes(String(x.error.detail).slice(0,40))?` (${esc(String(x.error.detail).slice(0,200))})`:''}</span>`:`<span class="sm" style="white-space:pre-wrap;line-height:1.5">${esc(flat(x.answer).slice(0,1500))}</span>`}</div>`).join(''):`<p class="muted" style="margin:0">Nothing yet. Ask Coach something and it shows up here.</p>`}</div>`},
+  inc(){const n=ui.incName||'', cur=stepFor(n), u=U(), opts=u==='lb'?[2.5,5,10,15,20]:[1,1.25,2,2.5,4.5,5,7,10];
+    return sheetHead(esc(n),'Weight jump')+`<div class="sheet-body"><p class="muted" style="margin:0;line-height:1.5">How much does the weight go up by on this machine or rack? The + and − buttons, your targets and Coach all use this, so suggestions are weights you can actually pick.</p>
+     <div class="mchips">${opts.map(v=>`<button class="chip tap" aria-pressed="${Math.abs(v-cur)<0.01}" data-a="incPick" data-v="${v}">${v} ${u}</button>`).join('')}</div>
+     <div><label class="flabel" for="incIn">Other (${u})</label><div class="row"><input id="incIn" class="field grow tn" type="text" inputmode="decimal" data-num="dec" enterkeyhint="done" autocomplete="off" value="${cur}"><button class="btn btn-primary tap" style="flex:none" data-a="incSave">Save</button></div></div>
+     ${hasInc(n)?`<div><button class="link plain tap" data-a="incReset">Use the default (${U()==='lb'?incDefaultKg(n)*2:incDefaultKg(n)} ${u})</button></div>`:''}</div>`},
+  backup(){return sheetHead('Backup','Copy this text')+`<div class="sheet-body"><p class="muted" style="margin:0">Your browser blocked automatic copying. Select all of the text below and copy it somewhere safe.</p><textarea id="bkText" class="field" readonly>${esc(backupText())}</textarea></div>`},
+  restore(){return sheetHead('Backup','Restore data')+`<div class="sheet-body"><button class="btn btn-ghost btn-block tap" data-a="pickBackup">${I('upload',17)} Choose a backup file</button><label class="flabel" for="rsText">Or paste a backup</label><textarea id="rsText" class="field" placeholder="{&quot;v&quot;:1,…}"></textarea><p class="err" id="rsErr" hidden></p><p class="muted" style="margin:0">Restoring replaces everything currently in the app.</p><button class="btn btn-primary btn-block tap" data-a="restore">Replace with backup</button></div>`}
 };
 /* ---- Android back gesture: closes the top layer first ---- */
 let navDepth=0, ignorePop=0, dockTracked=false;
@@ -2180,6 +2278,36 @@ window.addEventListener('popstate',()=>{
     if(ui.sheet) closeSheet({fromPop:true});
     else if(dockTracked){dockTracked=false;ui.dockOpen=false;ui.finish=null;renderDock()}}
 });
+/* full export: the whole app state, every Coach Q&A included; the API key lives elsewhere and is never in here */
+function backupText(){const o={...S,exportedAt:new Date().toISOString(),exportedFrom:'Flowfit'};delete o.active;if(S.active)o.activeWorkout=S.active;return JSON.stringify(o,null,1)}
+async function saveBackupFile(){
+  const name=`flowfit-backup-${todayISO()}.json`, txt=backupText();
+  try{if(window.__saveFile){await window.__saveFile(name,txt);return}}catch(e){toast('Couldn’t share the file. Copied instead.');try{await navigator.clipboard.writeText(txt)}catch(_){openSheet('backup')}return}
+  try{const b=new Blob([txt],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Backup saved')}catch(e){openSheet('backup')}
+}
+function grabSetup(){const u=ui.setup;if(!u)return;const v=(id,k)=>{const el=$('#'+id);if(el)u[k]=el.value};v('setupProtect','protect');v('setupGoalDate','goalDate');v('setupGoalText','goalText')}
+/* ---- app updates: new builds are published as GitHub releases ---- */
+const REPO='yashastejcm4/flowfit', UPDK='flowfit.update';
+const myBuild=()=>+(window.FLOWFIT_BUILD||0);
+const isNative=()=>!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const updInfo=()=>{try{return JSON.parse(localStorage.getItem(UPDK))||null}catch(e){return null}};
+const updReady=()=>{const u=updInfo();return !!(u&&u.url&&myBuild()&&u.latest>myBuild())};
+async function checkUpdate(manual){
+  if(ui.updBusy)return; ui.updBusy=true; if(manual)render();
+  try{const r=await fetchT(`https://api.github.com/repos/${REPO}/releases/latest`,10000); if(!r.ok)throw 0;
+    const j=await r.json(), n=parseInt(String(j.tag_name||'').replace(/\D/g,''),10)||0, a=(j.assets||[]).find(x=>/\.apk$/i.test(x.name));
+    const u={checked:Date.now(),latest:n,url:a?a.browser_download_url:null}; try{localStorage.setItem(UPDK,JSON.stringify(u))}catch(e){}
+    if(manual)toast(!myBuild()?'This copy isn’t from a GitHub build':n>myBuild()?`Build ${n} is ready to install`:'You’re on the latest version');
+    else if(n>myBuild()&&myBuild())toast(`Flowfit build ${n} is out. Update in Profile`);
+  }catch(e){if(manual)toast('Couldn’t check for updates. Are you online?')}
+  finally{ui.updBusy=false;render()}
+}
+function updLine(){
+  const b=myBuild(), u=updInfo(), ready=updReady();
+  const sub=ui.updBusy?'Checking…':ready?`Build ${u.latest} is ready. It downloads, then tap Install. Your data stays.`:b?`Build ${b}${u&&u.checked?' · up to date':''}`:'Test copy (not from GitHub)';
+  return `<div class="set-line"><div class="sl-t"><span>App version</span><span class="faint">${esc(sub)}</span></div>${ready?`<button class="btn btn-primary btn-sm tap" style="flex:none" data-a="updInstall">Update</button>`:`<button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="updCheck" ${ui.updBusy?'disabled':''}>Check</button>`}</div>`;
+}
+function setInc(name,v){incs()[incKey(name)]=fromDisp(v);refreshDraft();closeSheet();render();buzz(15);toast(`${name}: goes up in ${v} ${U()} steps`)}
 function openSheet(name){
   const was=!!ui.sheet; ui.sheet=name; const r=$('#sheetRoot'); r.classList.remove('closing');
   if(!was){ovOpen();const old=$('#sheetRoot .sheet'),sd=$('#sheetRoot .shade');if(old){old.style.transform='';old.style.transition=''}if(sd){sd.style.opacity='';sd.style.transition=''}}
@@ -2294,7 +2422,7 @@ const act={
   askDiscard(){ui.finish='discard';renderDock()},
   discard(){S.active=null;ui.curSet={};ui.feel=null;if(ui.aiPend){clearTimeout(ui.aiPend.t);ui.aiPend=null}ui.finish=null;ui.dockOpen=false;ui.restEnd=0;wakeOff();render();toast('Workout discarded')},
   saveWorkout(){ui.curSet={};ui.feel=null;if(ui.aiPend){clearTimeout(ui.aiPend.t);ui.aiPend=null}const s=commit(S.active);S.active=null;S.override=null;ui.finish=null;ui.dockOpen=false;ui.restEnd=0;wakeOff();buzz([30,60,30,60,60]);render();window.scrollTo({top:0,behavior:'smooth'});if(s){toast(`Saved · ${sessSets(s)} sets · ${fmtVol(sessVol(s))} ${U()}`);if(coachReady()){if(online()){runRecap(s.id);if(aiMode())setTimeout(planAhead,4000)}else{pend('recap:'+s.id);if(aiMode())pend('ahead')}}}},
-  stepW(d){const e=S.active.exercises[d.i],c=curIdx(e),s=e.sets[c];const st=stepSize(),cur=r1(toDisp(s.w)),v=Math.max(0,+d.d>0?Math.floor(cur/st+1e-9)*st+st:Math.ceil(cur/st-1e-9)*st-st);setW(e,c,fromDisp(v));bump('sw-'+e.id)},
+  stepW(d){const e=S.active.exercises[d.i],c=curIdx(e),s=e.sets[c];const v=stepFrom(e.name,r1(toDisp(s.w)),+d.d>0?1:-1);setW(e,c,fromDisp(v));bump('sw-'+e.id)},
   stepR(d){const e=S.active.exercises[d.i],c=curIdx(e),s=e.sets[c];if(s.pr==null&&!s.done)s.pr=s.r;s.r=clamp(s.r+(+d.d),1,100);if(!s.done)s.edited=true;propR(e,c);render();bump('sr-'+e.id)},
   pickSet(d){const e=S.active.exercises[d.i];ui.curSet[e.id]=+d.j;render()},
   tick(d){const a=S.active,e=a.exercises[d.i],s=e&&e.sets[d.j];if(!s)return;s.done=!s.done;
@@ -2322,6 +2450,10 @@ const act={
   cancelConfirmSheet(){ui.confirm=null;renderSheet()},
   delDay(){const snap=JSON.stringify(S.plan),nm=S.plan[ui.planDay].name;S.plan.splice(ui.planDay,1);ui.planDay=Math.max(0,ui.planDay-1);refreshDraft();closeSheet();render();toast(`Deleted ${nm}`,()=>{S.plan=JSON.parse(snap);refreshDraft();render()})},
   addEx(){ui.editEx=null;openSheet('exercise')},
+  openInc(d){ui.incName=d.n;openSheet('inc')},
+  incPick(d){setInc(ui.incName,+d.v)},
+  incSave(){const v=parseFloat((($('#incIn')||{}).value||'').replace(',','.'));if(!(v>0&&v<=50)){toast('Enter a number, like 5 or 7');buzz([10,40,10]);return}setInc(ui.incName,v)},
+  incReset(){delete incs()[incKey(ui.incName)];refreshDraft();closeSheet();render();toast('Back to the default step')},
   editEx(d){ui.editEx=+d.i;openSheet('exercise')},
   saveEx(){
     const name=$('#exName').value.trim(), sets=parseInt($('#exSets').value,10), rm=$('#exReps').value.match(/(\d+)(?:\s*[-–]\s*(\d+))?/), rest=parseInt($('#exRest').value,10), err=$('#exErr');
@@ -2331,6 +2463,8 @@ const act={
     const reps=clamp(+rm[1],1,100), hi=rm[2]&&+rm[2]>reps?Math.min(+rm[2],100):null;
     const obj={name,muscle:$('#exMuscle').value,sets,reps,repsHi:hi,rest:clamp(rest||S.settings.rest,10,600)};
     const d=S.plan[ui.planDay], isNew=ui.editEx==null;
+    const iv=parseFloat(($('#exInc')&&$('#exInc').value||'').replace(',','.'));
+    if(iv>0&&iv<=50&&(hasInc(name)||Math.abs(iv-stepFor(name))>0.01))incs()[incKey(name)]=fromDisp(iv);
     if(isNew) d.exercises.push({id:uid(),...obj}); else Object.assign(d.exercises[ui.editEx],obj);
     refreshDraft();closeSheet();render();buzz(15);toast(isNew?`Added ${name}`:'Saved');
   },
@@ -2365,9 +2499,14 @@ const act={
   setting(d){if(d.k==='unit'&&S.settings.unit!==d.v){if(S.coach)clearCoachAnswers();S.settings[d.k]=d.v;refreshDraft()}else S.settings[d.k]=d.v;render()},
   freq(d){S.profile.freq=clamp(S.profile.freq+(+d.d),1,7);render()},
   restDef(d){S.settings.rest=clamp(S.settings.rest+(+d.d),15,300);render()},
-  copyBackup(){const txt=JSON.stringify(S);try{navigator.clipboard.writeText(txt).then(()=>toast('Backup copied'),()=>openSheet('backup'))}catch(e){openSheet('backup')}},
+  copyBackup(){const txt=backupText();try{navigator.clipboard.writeText(txt).then(()=>toast('Backup copied'),()=>openSheet('backup'))}catch(e){openSheet('backup')}},
+  saveBackupFile(){saveBackupFile()},
+  updCheck(){checkUpdate(true)},
+  updInstall(){const u=updInfo();if(!u||!u.url)return;buzz(15);toast('Downloading. Open the file when it finishes, then tap Install');setTimeout(()=>{if(isNative())location.href=u.url;else window.open(u.url,'_blank')},400)},
+  openLog(){openSheet('coachlog')},
   openRestore(){openSheet('restore')},
-  restore(){const err=$('#rsErr');try{const o=JSON.parse($('#rsText').value);if(!o||o.v!==1||!Array.isArray(o.plan)||!Array.isArray(o.sessions))throw 0;S=o;Object.assign(ui,{curSet:{},restEnd:0,finish:null,dockOpen:false,planDay:0,sel:todayISO()});closeSheet();lastView=null;render();toast('Backup restored')}catch(e){err.textContent='That doesn’t look like an Flowfit backup. Paste the full text you copied.';err.hidden=false}},
+  pickBackup(){const f=$('#bkIn');if(f){f.value='';f.click()}},
+  restore(){const err=$('#rsErr');try{const o=JSON.parse($('#rsText').value);if(!o||o.v!==1||!Array.isArray(o.plan)||!Array.isArray(o.sessions))throw 0;if(o.activeWorkout&&!o.active)o.active=o.activeWorkout;delete o.activeWorkout;delete o.exportedAt;delete o.exportedFrom;S=o;save();Object.assign(ui,{curSet:{},restEnd:0,finish:null,dockOpen:false,planDay:0,sel:todayISO()});closeSheet();lastView=null;render();toast('Backup restored')}catch(e){err.textContent='That doesn’t look like a Flowfit backup. Paste the full text you copied.';err.hidden=false}},
   loadDemo(){if(!loadDemo())return;lastView=null;render();toast('Sample history added')},
   clearDemo(){S.sessions=S.sessions.filter(s=>!s.demo);S.profile.weights=S.profile.weights.filter(w=>!w.demo);refreshDraft();render();toast('Sample history removed')},
   resetArm(){ui.resetArm=true;render()},
@@ -2390,13 +2529,15 @@ const act={
   mediaChoose(d){const k=mkey(ui.mediaFor);M()[k]={fid:d.id,auto:false};ui.mediaPick=false;buzz(12);rerender();openMediaFor(ui.mediaFor)},
   mediaNone(){M()[mkey(ui.mediaFor)]={fid:null,auto:false};ui.mediaPick=false;rerender();toast('Picture removed for this exercise')},
   guidesToggle(){S.settings.guides=S.settings.guides===false;render()},
-  setupOpen(){const t=S.profile.train||{};ui.setup={exp:t.exp||null,goal:t.goal||null,effort:t.effort||null,where:t.where||null,mins:t.mins?String(t.mins):null,protect:t.protect||'',mode:prog().mode,prio:[...prog().priority]};openSheet('setup')},
-  setupPick(d){const v=$('#setupProtect');if(v)ui.setup.protect=v.value;ui.setup[d.k]=d.v;buzz(8);renderSheet()},
-  setupPrio(d){const v=$('#setupProtect');if(v)ui.setup.protect=v.value;const l=ui.setup.prio||(ui.setup.prio=[]),i=l.indexOf(d.m);if(i>=0)l.splice(i,1);else{if(l.length>=2)l.shift();l.push(d.m)}buzz(8);renderSheet()},
+  setupOpen(){const t=S.profile.train||{},g=t.target||{};ui.setup={exp:t.exp||null,goal:t.goal||null,effort:t.effort||null,where:t.where||null,mins:t.mins?String(t.mins):null,protect:t.protect||'',goalDate:g.date||'',goalText:g.text||'',mode:prog().mode,prio:[...prog().priority]};openSheet('setup')},
+  setupPick(d){grabSetup();ui.setup[d.k]=d.v;buzz(8);renderSheet()},
+  setupPrio(d){grabSetup();const l=ui.setup.prio||(ui.setup.prio=[]),i=l.indexOf(d.m);if(i>=0)l.splice(i,1);else{if(l.length>=2)l.shift();l.push(d.m)}buzz(8);renderSheet()},
   setupSave(){const u=ui.setup,v=$('#setupProtect');const miss=['exp','goal','effort','where','mins'].filter(k=>!u[k]);
     if(miss.length){toast('Answer the questions above first');buzz([10,40,10]);return}
     const isNew=!S.profile.train, p=prog();
-    S.profile.train={exp:u.exp,goal:u.goal,effort:u.effort,where:u.where,mins:+u.mins,protect:(v?v.value:u.protect||'').trim().slice(0,120)};
+    grabSetup(); const old=S.profile.train&&S.profile.train.target;
+    S.profile.train={exp:u.exp,goal:u.goal,effort:u.effort,where:u.where,mins:+u.mins,protect:(u.protect||'').trim().slice(0,120)};
+    if(/^\d{4}-\d{2}-\d{2}$/.test(u.goalDate||''))S.profile.train.target={date:u.goalDate,text:(u.goalText||'').trim().slice(0,80),set:old&&old.date===u.goalDate&&old.set?old.set:todayISO()};
     if(isNew||p.mode!==(u.mode||'block')){p.mode=u.mode||'block';p.anchor=weekStart(todayISO())}
     p.priority=(u.prio||[]).slice(0,2);
     refreshDraft();closeSheet();render();toast(`Saved · ${phaseLine(phaseNow())}`)},
@@ -2415,7 +2556,7 @@ const act={
     if(!(e.sug&&e.sug.src==='ai'))adjustNext(e,+d.j);
     if(ui.aiPend&&ui.aiPend.eid===e.id&&ui.aiPend.j===+d.j){clearTimeout(ui.aiPend.t);ui.aiPend=null;runNextSet(e,+d.j)}
     setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id&&ui.feel.j===+d.j){ui.feel=null;renderDock()}},700);render()},
-  useSug(d){const e=S.active.exercises[+d.i];if(!e||!e.sug)return;const g=e.sug;e.sets.forEach((x,k)=>{if(!x.done){x.w=g.w;if(g.src==='ai'){x.r=g.r;x.r0=g.r;if(k===e.sets.findIndex(y=>!y.done))x.rir=g.rir}}});delete e.sug;buzz(15);render();bump('sw-'+e.id)},
+  useSug(d){const e=S.active.exercises[+d.i];if(!e||!e.sug)return;const g=e.sug;e.sets.forEach((x,k)=>{if(!x.done){x.w=g.w;if(g.reps){x.r=g.r;x.r0=g.r}if(g.src==='ai'){x.r=g.r;x.r0=g.r;if(k===e.sets.findIndex(y=>!y.done))x.rir=g.rir}}});delete e.sug;buzz(15);render();bump('sw-'+e.id)},
   whyTarget(d){const e=S.active&&S.active.exercises[+d.i];if(e&&e.tg&&e.tg.kind!=='new')runWhy(e)},
   ptab(d){if(ui.ptab===d.v)return;ui.ptab=d.v;lastView=null;render();window.scrollTo(0,0)},
   prange(d){ui.range=d.v;render()},
@@ -2445,14 +2586,14 @@ const act={
   chatSend(){
     const inp=$('#chatIn'),q=(inp&&inp.value||'').trim();if(!q||ui.busy.chat)return;
     if(!coachReady()){toast('Add your Groq or Claude key in Profile first');return}
-    const c=C();c.chat.push({role:'user',content:q.slice(0,800)});const last={role:'assistant',content:'',pending:true};c.chat.push(last);
+    const c=C();c.chat.push({role:'user',content:q.slice(0,800),at:Date.now()});const last={role:'assistant',content:'',pending:true};c.chat.push(last);
     inp.value='';ui.busy.chat=true;ui.chatCtl=new AbortController();renderSheet();scrollChat();
     const hist=c.chat.filter(m=>!m.pending&&!m.err).slice(-10).map(({role,content})=>({role,content}));
     const msgs=[{role:'system',content:SYS+'\nAnswer the lifter in under 120 words unless they ask for more. Use the DATA block for anything about their training.\n\nDATA:\n'+JSON.stringify(coachData())},...hist];
     coachStream(msgs,t=>{last.content=t;const el=document.getElementById('msg-live');if(el){el.textContent=t;scrollChat()}},ui.chatCtl.signal)
-      .then(t=>{last.content=t||'Stopped.'})
-      .catch(e=>{last.content=e.message||'Coach couldn’t answer this time.';last.err=true})
-      .finally(()=>{delete last.pending;ui.busy.chat=false;ui.chatCtl=null;if(c.chat.length>40)c.chat.splice(0,c.chat.length-40);save();if(ui.sheet==='chat'){renderSheet();scrollChat()}buzz(10)});
+      .then(t=>{last.content=t||'Stopped.';last.at=Date.now();clog({kind:'chat',ask:q,answer:last.content})})
+      .catch(e=>{last.content=e.message||'Coach couldn’t answer this time.';last.err=true;last.at=Date.now();if(e.detail)last.detail=String(e.detail).slice(0,400);if(e.code!=='cancel')clog({kind:'chat',ask:q,error:errObj(e)})})
+      .finally(()=>{delete last.pending;ui.busy.chat=false;ui.chatCtl=null;if(c.chat.length>200)c.chat.splice(0,c.chat.length-200);save();if(ui.sheet==='chat'){renderSheet();scrollChat()}buzz(10)});
   },
   chatStop(){if(ui.chatCtl)ui.chatCtl.abort()},
   chatClear(){C().chat=[];renderSheet()},
@@ -2491,8 +2632,8 @@ function maybeBonus(e,j){
   const a=S.active, ph=a.phase||'block';
   if(e.sets[j].feel!=='easy'||j!==e.sets.length-1||!e.sets.every(x=>x.done)) return false;
   if(ph==='deload'||a.ready==='tired'||(e.bonus||0)>=2) return false;
-  const last=e.sets[j], st=stepSize(), w=last.w>0?fromDisp(r1(toDisp(last.w))+st):0;
-  e.sets.push({w,r:last.r,rir:failureOK(e.name)?0:1,bonus:true,done:false,r0:last.r});
+  const last=e.sets[j], cur=r1(toDisp(last.w)), up=last.w>0?stepFrom(e.name,cur,1):0, ok=up>0&&repsAt(cur,last.r,up)>=Math.max(5,last.r-3), w=ok?fromDisp(up):last.w, rr=ok?last.r:last.r+2;
+  e.sets.push({w,r:rr,rir:failureOK(e.name)?0:1,bonus:true,done:false,r0:rr});
   e.bonus=(e.bonus||0)+1; delete e.sug; ui.openEx=e.id; ui.feel=null;
   if(ui.finish==='confirm'){ui.finish=null;ui.dockOpen=false}
   if(ui.aiPend){clearTimeout(ui.aiPend.t);ui.aiPend=null}
@@ -2639,7 +2780,10 @@ $('#fileIn').addEventListener('change',e=>{const f=e.target.files&&e.target.file
     if(ui.sheet)renderSheet();else openSheet('import')};
   r.onerror=()=>{ui.impErr=`Couldn’t read ${f.name}. Try pasting its text instead.`;ui.imp='paste';renderSheet()};
   r.readAsText(f)});
-window.addEventListener('online',()=>{rerender();setTimeout(flushPending,1500)});window.addEventListener('offline',rerender);
+$('#bkIn').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const t=$('#rsText');if(t){t.value=String(r.result||'');toast(`Loaded ${f.name}. Tap Replace to restore.`)}};r.readAsText(f)});
+window.addEventListener('online',()=>{rerender();setTimeout(flushPending,1500)});
+/* look for a new build once a day, quietly */
+setTimeout(()=>{const u=updInfo();if(isNative()&&myBuild()&&online()&&(!u||Date.now()-u.checked>20*36e5))checkUpdate(false)},4000);window.addEventListener('offline',rerender);
 window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v)&&v!==ui.view){ui.view=v;render()}});
 document.addEventListener('visibilitychange',()=>{
   const a=S.active, live=a&&a.started, w=live&&win(), now=Date.now();

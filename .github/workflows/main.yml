@@ -37,8 +37,21 @@ jobs:
       - name: App icon and splash from assets/
         run: npx capacitor-assets generate --android
 
+      - name: Stamp the build number into the app (used by "Check for updates")
+        run: echo "window.FLOWFIT_BUILD=${{ github.run_number }};window.FLOWFIT_SHA='${GITHUB_SHA::7}';" > www/build.js
+
       - name: Copy web app into Android
         run: npx cap sync android
+
+      - name: Sign with Flowfit's fixed key, so each new APK installs over the old one
+        env:
+          KS: ${{ secrets.FLOWFIT_KEYSTORE }}
+        run: |
+          if [ -n "$KS" ]; then
+            mkdir -p ~/.android && echo "$KS" | base64 -d > ~/.android/debug.keystore && echo "Fixed signing key in place"
+          else
+            echo "::warning::FLOWFIT_KEYSTORE secret is not set. This APK gets a random key and won't install over older builds."
+          fi
 
       - name: Build debug APK
         working-directory: android
