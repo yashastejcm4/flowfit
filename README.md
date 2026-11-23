@@ -8,14 +8,15 @@ Flowfit is a workout logging app built for speed. Open it, log your set, put the
 
 - Today's workout opens automatically from your split
 - Log weight and reps with plus and minus buttons, then tap how the set felt
-- Next-weight suggestions based on your reps and effort
+- Next-weight suggestions based on your reps and effort, using each machine's real weight steps (set 7 kg for a stack that jumps 7 kg and it builds reps first, then jumps)
+- A goal date with a countdown, plus a "Lean and fit" goal (build muscle, lose belly fat)
 - Rest timer with a lock-screen notification on Android
 - Training phases (build, progress, push, deload) that set how hard each set should be
 - Import a plan from plain text, like `Bench Press 4x8`
 - Progress charts: estimated 1-rep max, PRs, bodyweight average, sets per muscle
 - Consistency grid and streaks that allow rest days
 - Optional AI coach powered by Groq (free) or Claude — just paste either API key
-- Backup and restore, plus a second copy saved in Android storage
+- Backup and restore as a file, plus a second copy saved in Android storage. Backups include every Coach question and answer (Profile → AI Coach → Coach history)
 
 ## AI coach and privacy
 

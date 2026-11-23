@@ -82,5 +82,16 @@
     }, 500);
   }
 
+  /* 6. Backup file: written to the app's cache, then the share sheet (save to Files, Drive, WhatsApp…) */
+  const { Filesystem, Share } = P;
+  if (Filesystem && Share) {
+    window.__saveFile = async (name, text) => {
+      await Filesystem.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8', recursive: true });
+      const { uri } = await Filesystem.getUri({ path: name, directory: 'CACHE' });
+      try { await Share.share({ title: 'Flowfit backup', files: [uri], dialogTitle: 'Save your Flowfit backup' }); }
+      catch (e) { if (/cancel/i.test(String(e && e.message || e))) return; throw e; }
+    };
+  }
+
   if (SplashScreen) { try { SplashScreen.hide(); } catch (e) {} }
 })();
