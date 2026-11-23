@@ -48,7 +48,9 @@ jobs:
           KS: ${{ secrets.FLOWFIT_KEYSTORE }}
         run: |
           if [ -n "$KS" ]; then
-            mkdir -p ~/.android && echo "$KS" | base64 -d > ~/.android/debug.keystore && echo "Fixed signing key in place"
+            echo "$KS" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/flowfit.keystore"
+            echo "SIGN_ARGS=-Pandroid.injected.signing.store.file=$RUNNER_TEMP/flowfit.keystore -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=androiddebugkey -Pandroid.injected.signing.key.password=android" >> "$GITHUB_ENV"
+            echo "Fixed signing key in place"
           else
             echo "::warning::FLOWFIT_KEYSTORE secret is not set. This APK gets a random key and won't install over older builds."
           fi
@@ -57,7 +59,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon $SIGN_ARGS
 
       - uses: actions/upload-artifact@v4
         with:
