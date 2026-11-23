@@ -610,6 +610,7 @@ a.btn{text-decoration:none}
 <input type="file" id="fileIn" hidden accept=".txt,.md,text/plain,text/markdown">
 <input type="file" id="bkIn" hidden accept=".json,application/json,text/plain">
 
+<script src="build.js"></script>
 <script>
 /* ---------- utils ---------- */
 const $=s=>document.querySelector(s);
@@ -2129,6 +2130,7 @@ function viewProfile(){
   <div class="sec"><h2>Settings</h2></div>
   <section class="card" style="gap:6px">
    <div class="set-line"><span>Appearance</span>${seg('theme',S.settings.theme,['auto','dark','light'])}</div>
+   ${updLine()}
    <div class="set-line"><span>Units</span>${seg('unit',S.settings.unit,['kg','lb'])}</div>
    <div class="set-line"><span>Workouts per week</span><div class="mini-step"><button class="tap" data-a="freq" data-d="-1" aria-label="Fewer per week">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="freq" value="${p.freq}" aria-label="Workouts per week"><span>×</span></label><button class="tap" data-a="freq" data-d="1" aria-label="More per week">${I('plus',16)}</button></div></div>
    <div class="set-line"><div class="sl-t"><span>Exercise pictures</span><span class="faint">Shows how to do each move (needs internet)</span></div><button class="sw tap" role="switch" aria-checked="${guidesOn()}" aria-label="Exercise pictures" data-a="guidesToggle"></button></div>
@@ -2284,6 +2286,27 @@ async function saveBackupFile(){
   try{const b=new Blob([txt],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Backup saved')}catch(e){openSheet('backup')}
 }
 function grabSetup(){const u=ui.setup;if(!u)return;const v=(id,k)=>{const el=$('#'+id);if(el)u[k]=el.value};v('setupProtect','protect');v('setupGoalDate','goalDate');v('setupGoalText','goalText')}
+/* ---- app updates: new builds are published as GitHub releases ---- */
+const REPO='yashastejcm4/flowfit', UPDK='flowfit.update';
+const myBuild=()=>+(window.FLOWFIT_BUILD||0);
+const isNative=()=>!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
+const updInfo=()=>{try{return JSON.parse(localStorage.getItem(UPDK))||null}catch(e){return null}};
+const updReady=()=>{const u=updInfo();return !!(u&&u.url&&myBuild()&&u.latest>myBuild())};
+async function checkUpdate(manual){
+  if(ui.updBusy)return; ui.updBusy=true; if(manual)render();
+  try{const r=await fetchT(`https://api.github.com/repos/${REPO}/releases/latest`,10000); if(!r.ok)throw 0;
+    const j=await r.json(), n=parseInt(String(j.tag_name||'').replace(/\D/g,''),10)||0, a=(j.assets||[]).find(x=>/\.apk$/i.test(x.name));
+    const u={checked:Date.now(),latest:n,url:a?a.browser_download_url:null}; try{localStorage.setItem(UPDK,JSON.stringify(u))}catch(e){}
+    if(manual)toast(!myBuild()?'This copy isn’t from a GitHub build':n>myBuild()?`Build ${n} is ready to install`:'You’re on the latest version');
+    else if(n>myBuild()&&myBuild())toast(`Flowfit build ${n} is out. Update in Profile`);
+  }catch(e){if(manual)toast('Couldn’t check for updates. Are you online?')}
+  finally{ui.updBusy=false;render()}
+}
+function updLine(){
+  const b=myBuild(), u=updInfo(), ready=updReady();
+  const sub=ui.updBusy?'Checking…':ready?`Build ${u.latest} is ready. It downloads, then tap Install. Your data stays.`:b?`Build ${b}${u&&u.checked?' · up to date':''}`:'Test copy (not from GitHub)';
+  return `<div class="set-line"><div class="sl-t"><span>App version</span><span class="faint">${esc(sub)}</span></div>${ready?`<button class="btn btn-primary btn-sm tap" style="flex:none" data-a="updInstall">Update</button>`:`<button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="updCheck" ${ui.updBusy?'disabled':''}>Check</button>`}</div>`;
+}
 function setInc(name,v){incs()[incKey(name)]=fromDisp(v);refreshDraft();closeSheet();render();buzz(15);toast(`${name}: goes up in ${v} ${U()} steps`)}
 function openSheet(name){
   const was=!!ui.sheet; ui.sheet=name; const r=$('#sheetRoot'); r.classList.remove('closing');
@@ -2478,6 +2501,8 @@ const act={
   restDef(d){S.settings.rest=clamp(S.settings.rest+(+d.d),15,300);render()},
   copyBackup(){const txt=backupText();try{navigator.clipboard.writeText(txt).then(()=>toast('Backup copied'),()=>openSheet('backup'))}catch(e){openSheet('backup')}},
   saveBackupFile(){saveBackupFile()},
+  updCheck(){checkUpdate(true)},
+  updInstall(){const u=updInfo();if(!u||!u.url)return;buzz(15);toast('Downloading. Open the file when it finishes, then tap Install');setTimeout(()=>{if(isNative())location.href=u.url;else window.open(u.url,'_blank')},400)},
   openLog(){openSheet('coachlog')},
   openRestore(){openSheet('restore')},
   pickBackup(){const f=$('#bkIn');if(f){f.value='';f.click()}},
@@ -2756,7 +2781,9 @@ $('#fileIn').addEventListener('change',e=>{const f=e.target.files&&e.target.file
   r.onerror=()=>{ui.impErr=`Couldn’t read ${f.name}. Try pasting its text instead.`;ui.imp='paste';renderSheet()};
   r.readAsText(f)});
 $('#bkIn').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const t=$('#rsText');if(t){t.value=String(r.result||'');toast(`Loaded ${f.name}. Tap Replace to restore.`)}};r.readAsText(f)});
-window.addEventListener('online',()=>{rerender();setTimeout(flushPending,1500)});window.addEventListener('offline',rerender);
+window.addEventListener('online',()=>{rerender();setTimeout(flushPending,1500)});
+/* look for a new build once a day, quietly */
+setTimeout(()=>{const u=updInfo();if(isNative()&&myBuild()&&online()&&(!u||Date.now()-u.checked>20*36e5))checkUpdate(false)},4000);window.addEventListener('offline',rerender);
 window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v)&&v!==ui.view){ui.view=v;render()}});
 document.addEventListener('visibilitychange',()=>{
   const a=S.active, live=a&&a.started, w=live&&win(), now=Date.now();
