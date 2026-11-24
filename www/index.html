@@ -743,7 +743,7 @@ function stepFor(name){const v=incs()[incKey(name)];if(v!=null)return r1(toDisp(
 /* move a weight (display units) by k steps. A set jump (e.g. 7 kg) adds on top of the current weight; the default snaps to clean numbers */
 function stepFrom(name,cur,dir,k=1){const st=stepFor(name);if(customStep(name))return Math.max(0,r1(cur+dir*st*k));const v=cur/st,n=dir>0?Math.floor(v+1e-9)+k:Math.ceil(v-1e-9)-k;return Math.max(0,r1(n*st))}
 /* put any weight (display units) on this exercise's real weight steps */
-function snapW(name,w,ref){const st=stepFor(name);if(!(st>0)||!isFinite(w))return w;const base=customStep(name)&&ref!=null?ref:0;return Math.max(0,r1(base+Math.round((w-base)/st)*st))}
+function snapW(name,w,ref){const st=stepFor(name);if(!(st>0)||!isFinite(w)||!customStep(name))return w;const base=customStep(name)&&ref!=null?ref:0;return Math.max(0,r1(base+Math.round((w-base)/st)*st))}
 /* about pct lighter, on real steps (kg in, kg out). If one step is already more than that, keep the weight */
 function lighterKg(name,kg,pct){const st=stepFor(name),cur=r1(toDisp(kg));if(!customStep(name))return roundStepKg(kg*(1-pct),'down',name);const k=Math.round(cur*pct/st+1e-9);return fromDisp(Math.max(0,r1(cur-k*st)))}
 /* reps you'd likely get at a new weight, from a set you did (Epley) */
@@ -1654,6 +1654,10 @@ const deltaText=j=>isClaude()?(j.type==='content_block_delta'&&j.delta?.type==='
 /* every Coach question and answer is kept (and exported with backups) */
 function clog(o){if(!Array.isArray(S.coachLog))S.coachLog=[];S.coachLog.push({at:Date.now(),date:todayISO(),provider:PROV(),model:model(),...o});if(S.coachLog.length>400)S.coachLog.splice(0,S.coachLog.length-400);save()}
 const askText=messages=>{const u=[...messages].reverse().find(m=>m.role==='user');return u?String(u.content).split('\n\nDATA:')[0].slice(0,1200):''};
+/* does a Coach message mention only the weight the app is using? */
+function sayMatches(say,w){const m=[...String(say).matchAll(/(\d+(?:\.\d+)?)\s*(?:kg|kgs|lb|lbs)\b/gi)];return m.every(x=>Math.abs(parseFloat(x[1])-w)<0.01)}
+/* record whether the app actually used the last Coach answer of this kind */
+function markUsed(kind,v){const L=S.coachLog||[];for(let i=L.length-1;i>=0&&i>=L.length-6;i--)if(L[i].kind===kind&&L[i].used==null){L[i].used=v;save();return}}
 const errObj=e=>({code:e&&e.code||'other',msg:e&&e.message||String(e),detail:e&&e.detail||null});
 function coachJSON(name,schema,messages,{effort='medium'}={}){
   return queued(async()=>{
@@ -1678,7 +1682,7 @@ function coachJSON(name,schema,messages,{effort='medium'}={}){
           const j=await res.json(), txt=String(j?.choices?.[0]?.message?.content||''), a=txt.indexOf('{'), b=txt.lastIndexOf('}');
           out=JSON.parse(a>=0&&b>a?txt.slice(a,b+1):txt);
         }
-        clog({kind:name,ask:askText(messages),answer:out,attempt:attempt+1});
+        clog({kind:name,ask:askText(messages),answer:JSON.parse(JSON.stringify(out)),attempt:attempt+1});
         return out;
       }catch(e){
         lastErr=e;
@@ -1968,7 +1972,8 @@ function applyPlan(a,out,data){
   (out.exercises||[]).forEach(p=>{
     const e=ex.find(x=>x.name.toLowerCase()===String(p.exercise||'').toLowerCase()); if(!e||e.sets.some(x=>x.done)) return;
     const L=liftSessions(e.name), ref=L.length?r1(toDisp(L.at(-1).w)):null;
-    if(typeof p.weight==='number'&&isFinite(p.weight)&&ref!=null)p.weight=snapW(e.name,p.weight,ref);
+    if(ref==null) return; /* first time: Coach can't know the weight, so you find it */
+    if(typeof p.weight==='number'&&isFinite(p.weight))p.weight=snapW(e.name,p.weight,ref);
     if(!planCheck(e.name,p.weight,p.reps,ref)) return;
     const want=clamp(Number.isInteger(p.sets)?p.sets:e.sets.length,Math.max(1,e.sets.length-1),e.sets.length+1);
     while(e.sets.length<want) e.sets.push({w:e.sets.at(-1).w,r:e.sets.at(-1).r,rir:2,done:false});
@@ -1988,7 +1993,8 @@ function runSessionPlan(){
     const data=planData(ex);
     const out=await coachJSON('session',SCH_SESSION,planMsgs(data,false));
     if(S.active!==a) return;
-    if(!applyPlan(a,out,data)) throw new CoachErr('bad','Coach couldn’t plan today. Using the app’s targets.');
+    const used=applyPlan(a,out,data); markUsed('session',used?`yes: ${used} exercise${used>1?'s':''}`:'no: outside the safe range');
+    if(!used) throw new CoachErr('bad','Coach couldn’t plan today. Using the app’s targets.');
     if(typeof out.say==='string'&&out.say.trim()&&numbersOK(out.say,data)){a.say=out.say.trim().slice(0,200);coachSay(out.say.trim(),null)}
   });
 }
@@ -2019,6 +2025,7 @@ function runNextSet(e,j){
   const a=S.active; if(!a||!aiMode()) return;
   const s=e.sets[j]; if(!s||!s.done) return;
   const remaining=e.sets.filter((x,k)=>k>j&&!x.done).length, extras=e.sets.filter(x=>x.bonus).length;
+  if(remaining===0&&e.coachDone) return; /* Coach already said that's enough */
   const snap=`${s.w}|${s.r}|${s.feel||''}`, t0=s.doneAt||Date.now(), key='set:'+e.id;
   ui.busy[key]=true; rerender();
   const L=liftSessions(e.name);
@@ -2033,20 +2040,23 @@ function runNextSet(e,j){
     [{role:'system',content:SYS+TRAINER},{role:'user',content:instr+'\n\nDATA:\n'+JSON.stringify(data)}],{effort:'low'})
   .then(out=>{
     if(S.active!==a||!s.done||`${s.w}|${s.r}|${s.feel||''}`!==snap) return;
-    const say=typeof out.say==='string'&&numbersOK(out.say,data)?out.say.trim():'';
-    if(say)s.say=say.slice(0,200);
     if(typeof out.weight==='number'&&isFinite(out.weight))out.weight=snapW(e.name,out.weight,r1(toDisp(s.w)));
+    let say=typeof out.say==='string'&&numbersOK(out.say,data)?out.say.trim():'';
+    if(say&&out.decision!=='done'&&!sayMatches(say,out.weight))say=`Next set ${fmtW(out.weight)} ${U()} × ${out.reps}.`;
+    if(say)s.say=say.slice(0,200);
     const ok=planCheck(e.name,out.weight,out.reps,r1(toDisp(s.w)))&&Number.isInteger(out.effort)&&out.effort>=0&&out.effort<=5&&(out.effort>0||failureOK(e.name));
     const rest=Number.isInteger(out.rest)?clamp(out.rest,30,300):null;
     const setRest=()=>{if(rest){e.rest=rest;const end=t0+rest*1000;if(end>Date.now()&&ui.restEnd){ui.restTotal=rest*1000;ui.restEnd=end;if(S.active.win)S.active.win.plan=rest*1000}}};
     if(out.decision==='done'){
+      e.coachDone=true; markUsed('trainer','yes: stopped this exercise');
       const cut=e.sets.map((x,k)=>k>j&&!x.done&&!x.edited?k:-1).filter(k=>k>=0);
       if(cut.length){const removed=cut.map(k=>e.sets[k]);e.sets=e.sets.filter((x,k)=>!cut.includes(k));delete e.sug;ui.openEx=null;
         const id=e.id;setTimeout(()=>toast(`Coach: that’s enough ${e.name} today`,()=>{const ex=S.active&&S.active.exercises.find(x=>x.id===id);if(ex){ex.sets.push(...removed);render()}}),200)}
       else if(ui.feel&&ui.feel.eid===e.id){/* last set: no extra, nothing to remove */}
       coachSay(say||`Good work on ${e.name}. Moving on.`,e.id); return;
     }
-    if(!ok){if(remaining===0&&!e.sets.some((x,k)=>k>j))maybeBonus(e,j);return}
+    if(!ok){markUsed('trainer',`no: ${fmtW(out.weight)} ${U()} × ${out.reps} is outside the safe range`);if(remaining===0&&!e.sets.some((x,k)=>k>j))maybeBonus(e,j);return}
+    markUsed('trainer','yes');
     const w=fromDisp(out.weight);
     if(out.decision==='extra'){
       if(remaining>0||extras>=2) return;
@@ -2366,26 +2376,41 @@ const SHEET_TABS={
   Workouts:['ID','Date','Week of','Day','Start','End','Minutes','Sets','Drop sets','Volume (kg)','Ready','Sleep','Energy','Joint pain','Block week','Skipped','Coach said','App build'],
   Sets:['ID','Date','Week of','Day','Exercise','Muscle','Set','Weight (kg)','Reps','Target reps','Reps left (aim)','Felt','Drop set','Extra set','Strain','Rest taken (s)','Coach note','Weight step'],
   Targets:['ID','Date','Week of','Exercise','Target','Type','Why','Rule used','Last time','Rep range','Weight step','Reps before next jump','Lift status','Block week','Coach changed it from','Best set done','Hit target'],
-  Coach:['ID','Date','Time','Kind','Question / task','Answer','Error','Provider','Model','Raw answer'],
+  Coach:['ID','Date','Time','Kind','Question / task','Answer','Used by app','Error','Provider','Model','Full prompt','Raw answer'],
   Body:['ID','Date','Weight (kg)']
 };
+const COACH_KIND={chat:'You asked',trainer:'Next set',session:'Workout plan',targets:'Today’s targets',report:'Coach report',recap:'Workout recap',checkin:'Weekly check-in',fix:'Fix for a lift',review:'Split review',why:'Why this target'};
+const shortAsk=t=>{t=String(t||'');const m=t.match(/^(.*?[.?!])(\s|$)/);return (m?m[1]:t).slice(0,200)};
+function answerTxt(kind,o){
+  if(!o||typeof o!=='object')return flatTxt(o);
+  const kgx=(w,r)=>`${fmtW(w)} kg × ${r}`;
+  try{
+    if(kind==='trainer')return `${o.decision==='done'?'Stop this exercise':o.decision==='extra'?`One more set: ${kgx(o.weight,o.reps)}`:`Next set: ${kgx(o.weight,o.reps)}`}${o.decision!=='done'?`, ${o.effort} reps left, rest ${o.rest}s`:''}. “${o.say||''}”`;
+    if(kind==='session')return (o.exercises||[]).map(x=>`${x.exercise}: ${x.sets} × ${kgx(x.weight,x.reps)}, rest ${x.rest}s. ${x.cue||''}`).join('\n')+(o.say?`\n“${o.say}”`:'');
+    if(kind==='report')return [o.headline,o.summary,...(o.wins||[]).map(w=>'Win: '+(w.text||'')),...(o.watch||[]).map(w=>'Watch: '+(w.text||'')),...(o.nextWeek||[]).map(n=>`Next week: ${n.title} (${n.exercise||'all'}${n.value!=null?', '+n.value:''}). ${n.reason||''}`)].filter(Boolean).join('\n');
+    if(kind==='recap')return `Better: ${o.improved||''}\nNext: ${o.next||''}`;
+    if(kind==='targets')return (o.targets||[]).map(x=>`${x.exercise}: ${kgx(x.weight,x.reps)}. ${x.reason||''}`).join('\n');
+  }catch(e){}
+  return flatTxt(o);
+}
 function sessionRows(s){
   const wk=weekStart(s.date), mins=Math.max(1,Math.round((s.end-s.start)/60000)), all=s.exercises.flatMap(e=>e.sets), drops=all.filter(x=>x.d).length, ck=s.check||{};
-  const ph=s.phase&&typeof s.phase==='object'?s.phase.label:s.phase||'';
+  const ph=s.phase==='deload'?'Easy week':s.phase==='steady'?'Steady':(()=>{try{return phaseNow(s.date).label}catch(e){return s.phase||''}})();
   const W=[[s.id,s.date,wk,s.dayName,hhmm(s.start),hhmm(s.end),mins,all.length-drops,drops,Math.round(all.reduce((a,x)=>a+x.w*x.r,0)),s.ready||'',ck.sleep||'',ck.energy||'',ck.joint?'yes':'',ph,(s.skipped||[]).join(', '),s.coachSaid||'',myBuild()||'']];
   const SE=[], T=[];
   s.exercises.forEach((e,ei)=>{let n=0;
     e.sets.forEach((x,j)=>{if(!x.d)n++;SE.push([`${s.id}-${ei}-${j}`,s.date,wk,s.dayName,e.name,e.muscle,x.d?`${n} drop`:n,x.w,x.r,x.tr||'',x.t!=null?x.t:'',x.f||'',!!x.d,!!x.x,x.st!=null?x.st:'',x.sig&&x.sig.restTakenSec!=null?x.sig.restTakenSec:'',x.c||'',e.step||''])});
     const tg=e.target; if(!tg)return; const c=tg.calc||{}, ms=e.sets.filter(x=>!x.d), top=ms.length?ms.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a):null;
-    const hit=top&&tg.r?(top.w>=tg.w-1e-9&&top.r>=tg.r?'yes':'no'):'';
+    const hit=tg.kind==='new'?'':top&&tg.r?(top.w>=tg.w-1e-9&&top.r>=tg.r?'yes':'no'):'';
     T.push([`${s.id}-${ei}`,s.date,wk,e.name,tg.kind==='new'?'Find your weight':`${fmtW(tg.w)} kg × ${tg.r}`,tg.kind,tg.why||'',c.rule||'',c.last||'',c.range||'',c.step||'',c.needBeforeJump||'',c.status||'',c.phase||'',e.appTarget?`${fmtW(e.appTarget.w)} kg × ${e.appTarget.r} (${e.appTarget.why||''})`:'',top?`${fmtW(top.w)} kg × ${top.r}`:'',hit])});
   return {Workouts:W,Sets:SE,Targets:T};
 }
+const SYNC_V=2; /* bump when sheet columns change: everything is re-sent once */
 function pendingRows(all){
-  const y=SY(), out={Workouts:[],Sets:[],Targets:[],Coach:[],Body:[]}, mark={s:{},b:{},c:y.c};
+  const y=SY(); all=all||y.v!==SYNC_V; const out={Workouts:[],Sets:[],Targets:[],Coach:[],Body:[]}, mark={s:{},b:{},c:y.c};
   S.sessions.filter(s=>!s.demo).forEach(s=>{const h=hsh(s);if(!all&&y.s[s.id]===h)return;const r=sessionRows(s);Object.keys(r).forEach(k=>out[k].push(...r[k]));mark.s[s.id]=h});
   (S.coachLog||[]).forEach(x=>{if(!all&&x.at<=y.c)return;const d=new Date(x.at);
-    out.Coach.push([`${x.at}-${x.kind}`,x.date||todayISO(),hhmm(x.at),x.kind,x.ask||'',x.error?'':flatTxt(x.answer),x.error?`${x.error.msg||''}${x.error.detail?' | '+x.error.detail:''}`:'',x.provider||'',x.model||'',x.answer&&typeof x.answer==='object'?x.answer:'']);mark.c=Math.max(mark.c,x.at)});
+    out.Coach.push([`${x.at}-${x.kind}`,x.date||todayISO(),hhmm(x.at),COACH_KIND[x.kind]||x.kind,x.kind==='chat'?x.ask||'':shortAsk(x.ask),x.error?'':answerTxt(x.kind,x.answer),x.used||'',x.error?`${x.error.msg||''}${x.error.detail?' | '+x.error.detail:''}`:'',x.provider||'',x.model||'',x.kind==='chat'?'':x.ask||'',x.answer&&typeof x.answer==='object'?x.answer:'']);mark.c=Math.max(mark.c,x.at)});
   (S.profile.weights||[]).filter(w=>!w.demo).forEach(w=>{if(!all&&y.b[w.date]===w.kg)return;out.Body.push([w.date,w.date,w.kg]);mark.b[w.date]=w.kg});
   const n=Object.values(out).reduce((a,r)=>a+r.length,0);
   return {out,mark,n};
@@ -2401,7 +2426,7 @@ async function syncSheets(all,manual){
     const tabs=Object.keys(out).filter(k=>out[k].length).map(k=>({name:k,header:SHEET_TABS[k],rows:out[k].map(r=>r.map(cell))}));
     const res=await fetchT(url,30000,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({app:'Flowfit',build:myBuild(),sentAt:new Date().toISOString(),tabs})});
     const j=await res.json(); if(!j||!j.ok)throw new Error(j&&j.error||'The sheet didn’t accept the data');
-    const y=SY(); Object.assign(y.s,mark.s); Object.assign(y.b,mark.b); y.c=Math.max(y.c,mark.c); y.last=Date.now(); ui.syncErr=null; save();
+    const y=SY(); Object.assign(y.s,mark.s); Object.assign(y.b,mark.b); y.c=Math.max(y.c,mark.c); y.last=Date.now(); y.v=SYNC_V; ui.syncErr=null; save();
     if(manual)toast(`Sent ${n} row${n>1?'s':''} to Google Sheets`);
   }catch(e){ui.syncErr=String(e&&e.message||e).slice(0,160);if(manual)toast('Couldn’t reach your sheet. Check the link');}
   finally{ui.syncing=false;render()}
