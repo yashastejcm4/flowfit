@@ -1,3 +1,4 @@
+/** @OnlyCurrentDoc */
 /**
  * Flowfit → Google Sheets receiver.
  * Paste into Extensions → Apps Script of your Flowfit Log sheet, then
