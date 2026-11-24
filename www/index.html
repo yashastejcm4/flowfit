@@ -702,7 +702,7 @@ function defaultState(){
 let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||S.v!==1){S=defaultState();window.__fresh=true}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{window.__onSave&&window.__onSave()}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{window.__onSave&&window.__onSave()}catch(e){}try{if(typeof syncSoon==='function'&&!(S.active&&S.active.started))syncSoon()}catch(e){}};
 
 const VIEWS=['workout','plan','progress','profile'];
 const ui={view:VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):'workout',sel:todayISO(),dockOpen:false,curSet:{},planDay:0,progEx:null,progSearch:false,query:'',finish:null,restEnd:0,restTotal:0,imp:'menu',importText:'',parsed:null,impErr:'',sheet:null,calMonth:null,confirm:null,editEx:null,resetArm:false,today:todayISO(),ptab:'overview',range:'3m',busy:{},cerr:{},showKey:false,keyStatus:null,chatCtl:null};
@@ -849,7 +849,18 @@ function volTick(){
   p.volLog={week:ws,changes}; p.volWeek=ws;
 }
 /* today's target per exercise: double progression, shaped by the block week */
-function targetFor(pe){
+/* the numbers behind a target, written out so they can be checked later (synced to Google Sheets) */
+function targetFor(pe){const tg=targetCore(pe);try{tg.calc=calcFor(pe,tg)}catch(e){}return tg}
+function calcFor(pe,tg){
+  const name=pe.name, L=liftSessions(name), last=L.at(-1), lo=pe.reps, hi=pe.repsHi||pe.reps, u=U(), ph=phaseNow(), st=liftStatus(name);
+  const src=hasInc(name)?'you set it':learnedStep(name)?'learned from your logs':'default';
+  const need=last&&last.w>0?jumpNeed(name,r1(toDisp(last.w)),lo,hi):null;
+  return {last:last?`${last.sets.map(x=>`${fmtW(x.w)}×${x.r}`).join(', ')} (${fmtD(last.date)})`:'none yet',
+    range:`${lo}–${hi} reps`, step:`${stepFor(name)} ${u} (${src})`, needBeforeJump:need, status:st.label,
+    phase:ph.key==='block'?`${ph.label}, aim ${ph.rir} reps left`:ph.label, sessions:L.length,
+    rule:tg.kind==='new'?'No history: find a working weight':tg.kind==='up'?'Hit the target reps: add one step':tg.kind==='down'?'Lighter: easy week or a dip':need&&need>hi?`Big jump: build reps to ${need} before +${stepFor(name)} ${u}`:'Same weight, add a rep'};
+}
+function targetCore(pe){
   const name=pe.name, lo=pe.reps, hi=Math.max(pe.repsHi||pe.reps,lo), reps=lo===hi?`${lo}`:`${lo}–${hi}`, nw=S.nextW&&S.nextW[name.toLowerCase()], phx=phaseNow(), ph=phx.key;
   if(nw!=null) return {w:nw,r:lo,lo,hi,kind:'coach',why:'Coach suggestion you applied'};
   const L=liftSessions(name);
@@ -982,7 +993,7 @@ function adjustNext(e,j){
   e.sug={w:fromDisp(nw),dir,from:j,why,src:'app'};
 }
 function commit(a){
-  const tgt=t=>t&&{w:t.w,r:t.r,kind:t.kind,why:t.why};
+  const tgt=t=>t&&{w:t.w,r:t.r,kind:t.kind,why:t.why,calc:t.calc};
   const exs=a.exercises.filter(e=>!e.skipped).map(e=>{const o={name:e.name,muscle:e.muscle,sets:e.sets.filter(s=>s.done).map(s=>{const o={w:s.w,r:s.r};if(s.feel)o.f=s.feel;if(s.rir!=null)o.t=s.rir;if(s.r0)o.tr=s.r0;if(s.strain!=null)o.st=s.strain;if(s.bonus)o.x=1;if(s.drop)o.d=1;if(s.say)o.c=s.say;if(s.sig)o.sig=s.sig;return o})};
     if(e.tg)o.target=tgt(e.tg); if(e.tgApp)o.appTarget=tgt(e.tgApp); o.step=stepFor(e.name); if(e.late)o.late=1; return o}).filter(e=>e.sets.length);
   if(!exs.length) return null;
@@ -1122,7 +1133,7 @@ const mtok=s=>String(s).toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).fi
 function mscore(q,c){const A=new Set(mtok(q)),B=new Set(mtok(c));let i=0;A.forEach(w=>{if(B.has(w))i++});if(!i)return 0;const extra=[...B].filter(w=>!A.has(w));return i/(A.size+0.35*extra.length+0.6*extra.filter(w=>MODD.has(w)).length)}
 const mkey=n=>String(n||'').toLowerCase().trim();
 const mnorm=n=>mtok(n).join(' ');
-async function fetchT(url,ms){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{signal:c.signal})}finally{clearTimeout(t)}}
+async function fetchT(url,ms,opt){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{...(opt||{}),signal:c.signal})}finally{clearTimeout(t)}}
 let FEDB=null, fedbP=null;
 function loadFedb(){
   if(FEDB) return Promise.resolve(FEDB); if(fedbP) return fedbP;
@@ -2155,6 +2166,7 @@ function viewProfile(){
   <section class="card" style="gap:6px">
    <div class="set-line"><span>Appearance</span>${seg('theme',S.settings.theme,['auto','dark','light'])}</div>
    ${updLine()}
+   ${sheetLine()}
    <div class="set-line"><span>Units</span>${seg('unit',S.settings.unit,['kg','lb'])}</div>
    <div class="set-line"><span>Workouts per week</span><div class="mini-step"><button class="tap" data-a="freq" data-d="-1" aria-label="Fewer per week">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="freq" value="${p.freq}" aria-label="Workouts per week"><span>×</span></label><button class="tap" data-a="freq" data-d="1" aria-label="More per week">${I('plus',16)}</button></div></div>
    <div class="set-line"><div class="sl-t"><span>Exercise pictures</span><span class="faint">Shows how to do each move (needs internet)</span></div><button class="sw tap" role="switch" aria-checked="${guidesOn()}" aria-label="Exercise pictures" data-a="guidesToggle"></button></div>
@@ -2274,6 +2286,14 @@ const SHEETS={
      <button class="btn btn-primary btn-block tap" data-a="setupSave">Save</button>
      <button class="link plain tap" data-a="setupLater">${S.profile.train?'Cancel':'Later'}</button></div>`;
   },
+  sheetsync(){const u=sheetUrl();
+    return sheetHead('Google Sheets','Sync to your sheet')+`<div class="sheet-body">
+     <p class="muted" style="margin:0;line-height:1.5">Every finished workout, every set, each target with the numbers behind it, every Coach question and answer, and your weigh-ins go to your own Google Sheet. If you’re offline it waits and sends later.</p>
+     <div><label class="flabel" for="shUrl">Your sheet’s web app link</label><input id="shUrl" class="field" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(u)}"></div>
+     ${ui.syncErr?`<span class="sm c-danger" style="line-height:1.45">${esc(ui.syncErr)}</span>`:''}
+     <div class="row" style="gap:10px;flex-wrap:wrap"><button class="btn btn-primary tap" data-a="shSave">Save and test</button>${u?`<button class="btn btn-ghost tap" data-a="shAll" ${ui.syncing?'disabled':''}>${ui.syncing?'Syncing…':'Sync everything'}</button>`:''}</div>
+     ${u?`<button class="link plain tap" data-a="shOff">Disconnect</button>`:''}
+     <p class="faint sm" style="margin:0;line-height:1.5">The link stays on this phone and isn’t included in backups. Your API key is never sent.</p></div>`},
   coachlog(){
     const L=(S.coachLog||[]).slice().reverse().slice(0,150);
     const KIND={chat:'You asked',checkin:'Weekly check-in',fix:'Fix for a lift',recap:'Workout recap',targets:'Today’s targets',review:'Split review',why:'Why this target',session:'Session plan',trainer:'Set decision',report:'Coach report'};
@@ -2334,6 +2354,63 @@ function updLine(){
 }
 /* index to move an exercise to when its machine is busy: right after the next one you haven't finished */
 function nextOpenAfter(i){const a=S.active;if(!a)return 0;for(let k=i+1;k<a.exercises.length;k++){const x=a.exercises[k];if(!x.skipped&&x.sets.some(s=>!s.done))return k}return 0}
+/* ---- Google Sheets sync: everything goes to the user's own sheet through a small Apps Script link ---- */
+const SHK='flowfit.sheetUrl';
+const sheetUrl=()=>{try{return localStorage.getItem(SHK)||''}catch(e){return ''}};
+function SY(){if(!S.sync||typeof S.sync!=='object')S.sync={};const y=S.sync;y.s=y.s||{};y.b=y.b||{};y.c=y.c||0;return y}
+const hsh=x=>{const t=JSON.stringify(x);let h=0;for(let i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))|0;return String(h)};
+const cell=v=>{if(v==null)return '';if(typeof v==='number')return isFinite(v)?Math.round(v*100)/100:'';if(typeof v==='boolean')return v?'yes':'';let t=typeof v==='string'?v:JSON.stringify(v);if(/^[=+\-@]/.test(t))t="'"+t;return t.slice(0,45000)};
+const hhmm=t=>{if(!t)return '';const d=new Date(t);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+const flatTxt=v=>typeof v==='string'||typeof v==='number'?String(v):Array.isArray(v)?v.map(flatTxt).filter(Boolean).join('\n'):v&&typeof v==='object'?Object.values(v).map(flatTxt).filter(Boolean).join(' · '):'';
+const SHEET_TABS={
+  Workouts:['ID','Date','Week of','Day','Start','End','Minutes','Sets','Drop sets','Volume (kg)','Ready','Sleep','Energy','Joint pain','Block week','Skipped','Coach said','App build'],
+  Sets:['ID','Date','Week of','Day','Exercise','Muscle','Set','Weight (kg)','Reps','Target reps','Reps left (aim)','Felt','Drop set','Extra set','Strain','Rest taken (s)','Coach note','Weight step'],
+  Targets:['ID','Date','Week of','Exercise','Target','Type','Why','Rule used','Last time','Rep range','Weight step','Reps before next jump','Lift status','Block week','Coach changed it from','Best set done','Hit target'],
+  Coach:['ID','Date','Time','Kind','Question / task','Answer','Error','Provider','Model','Raw answer'],
+  Body:['ID','Date','Weight (kg)']
+};
+function sessionRows(s){
+  const wk=weekStart(s.date), mins=Math.max(1,Math.round((s.end-s.start)/60000)), all=s.exercises.flatMap(e=>e.sets), drops=all.filter(x=>x.d).length, ck=s.check||{};
+  const ph=s.phase&&typeof s.phase==='object'?s.phase.label:s.phase||'';
+  const W=[[s.id,s.date,wk,s.dayName,hhmm(s.start),hhmm(s.end),mins,all.length-drops,drops,Math.round(all.reduce((a,x)=>a+x.w*x.r,0)),s.ready||'',ck.sleep||'',ck.energy||'',ck.joint?'yes':'',ph,(s.skipped||[]).join(', '),s.coachSaid||'',myBuild()||'']];
+  const SE=[], T=[];
+  s.exercises.forEach((e,ei)=>{let n=0;
+    e.sets.forEach((x,j)=>{if(!x.d)n++;SE.push([`${s.id}-${ei}-${j}`,s.date,wk,s.dayName,e.name,e.muscle,x.d?`${n} drop`:n,x.w,x.r,x.tr||'',x.t!=null?x.t:'',x.f||'',!!x.d,!!x.x,x.st!=null?x.st:'',x.sig&&x.sig.restTakenSec!=null?x.sig.restTakenSec:'',x.c||'',e.step||''])});
+    const tg=e.target; if(!tg)return; const c=tg.calc||{}, ms=e.sets.filter(x=>!x.d), top=ms.length?ms.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a):null;
+    const hit=top&&tg.r?(top.w>=tg.w-1e-9&&top.r>=tg.r?'yes':'no'):'';
+    T.push([`${s.id}-${ei}`,s.date,wk,e.name,tg.kind==='new'?'Find your weight':`${fmtW(tg.w)} kg × ${tg.r}`,tg.kind,tg.why||'',c.rule||'',c.last||'',c.range||'',c.step||'',c.needBeforeJump||'',c.status||'',c.phase||'',e.appTarget?`${fmtW(e.appTarget.w)} kg × ${e.appTarget.r} (${e.appTarget.why||''})`:'',top?`${fmtW(top.w)} kg × ${top.r}`:'',hit])});
+  return {Workouts:W,Sets:SE,Targets:T};
+}
+function pendingRows(all){
+  const y=SY(), out={Workouts:[],Sets:[],Targets:[],Coach:[],Body:[]}, mark={s:{},b:{},c:y.c};
+  S.sessions.filter(s=>!s.demo).forEach(s=>{const h=hsh(s);if(!all&&y.s[s.id]===h)return;const r=sessionRows(s);Object.keys(r).forEach(k=>out[k].push(...r[k]));mark.s[s.id]=h});
+  (S.coachLog||[]).forEach(x=>{if(!all&&x.at<=y.c)return;const d=new Date(x.at);
+    out.Coach.push([`${x.at}-${x.kind}`,x.date||todayISO(),hhmm(x.at),x.kind,x.ask||'',x.error?'':flatTxt(x.answer),x.error?`${x.error.msg||''}${x.error.detail?' | '+x.error.detail:''}`:'',x.provider||'',x.model||'',x.answer&&typeof x.answer==='object'?x.answer:'']);mark.c=Math.max(mark.c,x.at)});
+  (S.profile.weights||[]).filter(w=>!w.demo).forEach(w=>{if(!all&&y.b[w.date]===w.kg)return;out.Body.push([w.date,w.date,w.kg]);mark.b[w.date]=w.kg});
+  const n=Object.values(out).reduce((a,r)=>a+r.length,0);
+  return {out,mark,n};
+}
+let syncTimer=null;
+function syncSoon(ms=4000){if(!sheetUrl())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncSheets(false),ms)}
+async function syncSheets(all,manual){
+  const url=sheetUrl(); if(!url){if(manual)toast('Add your Google Sheets link first');return}
+  if(ui.syncing)return; if(!online()){if(manual)toast('Offline. It syncs when you’re back online');return}
+  const {out,mark,n}=pendingRows(all); if(!n){if(manual)toast('Everything is already in your sheet');ui.syncErr=null;return}
+  ui.syncing=true; if(manual)render();
+  try{
+    const tabs=Object.keys(out).filter(k=>out[k].length).map(k=>({name:k,header:SHEET_TABS[k],rows:out[k].map(r=>r.map(cell))}));
+    const res=await fetchT(url,30000,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({app:'Flowfit',build:myBuild(),sentAt:new Date().toISOString(),tabs})});
+    const j=await res.json(); if(!j||!j.ok)throw new Error(j&&j.error||'The sheet didn’t accept the data');
+    const y=SY(); Object.assign(y.s,mark.s); Object.assign(y.b,mark.b); y.c=Math.max(y.c,mark.c); y.last=Date.now(); ui.syncErr=null; save();
+    if(manual)toast(`Sent ${n} row${n>1?'s':''} to Google Sheets`);
+  }catch(e){ui.syncErr=String(e&&e.message||e).slice(0,160);if(manual)toast('Couldn’t reach your sheet. Check the link');}
+  finally{ui.syncing=false;render()}
+}
+function sheetLine(){
+  const u=sheetUrl(), y=SY(), p=u?pendingRows(false).n:0;
+  const sub=!u?'Send every workout, set, target and Coach answer to your own sheet':ui.syncing?'Syncing…':ui.syncErr?`Last try failed: ${ui.syncErr}`:p?`${p} row${p>1?'s':''} waiting${y.last?` · last sync ${fmtD(iso(new Date(y.last)))} ${hhmm(y.last)}`:''}`:y.last?`All synced · ${fmtD(iso(new Date(y.last)))} ${hhmm(y.last)}`:'Connected';
+  return `<div class="set-line"><div class="sl-t"><span>Google Sheets</span><span class="faint">${esc(sub)}</span></div><button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="openSheetSync">${u?'Manage':'Connect'}</button></div>`;
+}
 function setInc(name,v){incs()[incKey(name)]=fromDisp(v);refreshDraft();closeSheet();render();buzz(15);toast(`${name}: goes up in ${v} ${U()} steps`)}
 function openSheet(name){
   const was=!!ui.sheet; ui.sheet=name; const r=$('#sheetRoot'); r.classList.remove('closing');
@@ -2543,6 +2620,14 @@ const act={
   copyBackup(){const txt=backupText();try{navigator.clipboard.writeText(txt).then(()=>toast('Backup copied'),()=>openSheet('backup'))}catch(e){openSheet('backup')}},
   saveBackupFile(){saveBackupFile()},
   updCheck(){checkUpdate(true)},
+  openSheetSync(){openSheet('sheetsync')},
+  async shSave(){const v=(($('#shUrl')||{}).value||'').trim();
+    if(!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(v)){toast('Paste the link that starts with https://script.google.com/');buzz([10,40,10]);return}
+    try{localStorage.setItem(SHK,v)}catch(e){}
+    try{const r=await fetchT(v,15000);const j=await r.json();if(!j||!j.ok)throw 0;toast('Connected. Sending your data…');closeSheet();syncSheets(true,true)}
+    catch(e){ui.syncErr='Saved, but the test failed. Check the link and that the script is deployed for “Anyone”.';render()}},
+  shAll(){syncSheets(true,true)},
+  shOff(){try{localStorage.removeItem(SHK)}catch(e){}S.sync={};ui.syncErr=null;closeSheet();render();toast('Disconnected from Google Sheets')},
   updInstall(){const u=updInfo();if(!u||!u.url)return;buzz(15);toast('Downloading. Open the file when it finishes, then tap Install');setTimeout(()=>{if(isNative())location.href=u.url;else window.open(u.url,'_blank')},400)},
   openLog(){openSheet('coachlog')},
   openRestore(){openSheet('restore')},
@@ -2822,7 +2907,8 @@ $('#fileIn').addEventListener('change',e=>{const f=e.target.files&&e.target.file
   r.onerror=()=>{ui.impErr=`Couldn’t read ${f.name}. Try pasting its text instead.`;ui.imp='paste';renderSheet()};
   r.readAsText(f)});
 $('#bkIn').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const t=$('#rsText');if(t){t.value=String(r.result||'');toast(`Loaded ${f.name}. Tap Replace to restore.`)}};r.readAsText(f)});
-window.addEventListener('online',()=>{rerender();setTimeout(flushPending,1500)});
+window.addEventListener('online',()=>{rerender();setTimeout(flushPending,1500);syncSoon(3000)});
+setTimeout(()=>syncSoon(1000),6000);
 /* look for a new build once a day, quietly */
 setTimeout(()=>{const u=updInfo();if(isNative()&&myBuild()&&online()&&(!u||Date.now()-u.checked>20*36e5))checkUpdate(false)},4000);window.addEventListener('offline',rerender);
 window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v)&&v!==ui.view){ui.view=v;render()}});

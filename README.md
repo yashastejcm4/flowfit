@@ -16,6 +16,7 @@ Flowfit is a workout logging app built for speed. Open it, log your set, put the
 - Progress charts: estimated 1-rep max, PRs, bodyweight average, sets per muscle
 - Consistency grid and streaks that allow rest days
 - Optional AI coach powered by Groq (free) or Claude — just paste either API key
+- Sync to your own Google Sheet: every workout, set, target (with the numbers behind it), Coach question and answer, and weigh-in. Setup: paste `sheets/Code.gs` into your sheet's Apps Script, deploy as a web app, and paste the link into Profile → Settings → Google Sheets
 - Backup and restore as a file, plus a second copy saved in Android storage. Backups include every Coach question and answer (Profile → AI Coach → Coach history)
 
 ## AI coach and privacy
