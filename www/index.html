@@ -188,6 +188,8 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .ex-head .mu{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin-top:4px}
 .steppers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stp-l{font-size:12px;color:var(--muted);margin:0 0 6px 4px}
+.set .n{white-space:nowrap}
+.ex-acts{display:flex;gap:14px;align-items:center;flex:none}
 .stp-inc{font-size:12px;font-weight:600;padding:0;min-height:0;color:var(--accent-fg);text-decoration:underline dotted;text-underline-offset:3px}
 .stp{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;background:var(--surface-2);border-radius:999px;padding:4px}
 .stp button{height:40px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center;color:var(--fg)}
@@ -721,14 +723,29 @@ function incs(){if(!S.inc)S.inc={};return S.inc}
 const incKey=n=>String(n||'').toLowerCase().trim();
 const hasInc=name=>incs()[incKey(name)]!=null;
 const incDefaultKg=name=>MACHINE_RX.test(name||'')&&!DB_RX.test(name||'')?5:2.5;
-/* step for this exercise, in display units */
-function stepFor(name){const v=incs()[incKey(name)];if(v!=null)return r1(toDisp(v));return U()==='lb'?incDefaultKg(name)*2:incDefaultKg(name)}
+/* learn a machine's weight step from the weights you've logged on it (e.g. 25, 32, 39 → 7 kg) */
+let _lsKey='',_ls={};
+function learnedStep(name){
+  const a=S.active, key=S.sessions.length+':'+(a?a.exercises.reduce((n,e)=>n+e.sets.filter(x=>x.done).length,0):0)+':'+U();
+  if(key!==_lsKey){_lsKey=key;_ls={}}
+  const k=incKey(name); if(k in _ls) return _ls[k];
+  const ws=new Set(), add=sets=>sets.forEach(x=>{if(x.w>0)ws.add(Math.round(toDisp(x.w)*4)/4)});
+  S.sessions.forEach(s=>s.exercises.forEach(e=>{if(incKey(e.name)===k)add(e.sets)}));
+  if(a)a.exercises.forEach(e=>{if(incKey(e.name)===k)add(e.sets.filter(x=>x.done))});
+  const v=[...ws].sort((x,y)=>x-y), diffs=v.slice(1).map((x,i)=>r1(x-v[i])).filter(d=>d>0);
+  let out=null;
+  if(diffs.length){const d=Math.min(...diffs);if(d>=0.5&&d<=20&&diffs.every(x=>Math.abs(x/d-Math.round(x/d))<0.15))out=d}
+  return _ls[k]=out;
+}
+const customStep=name=>hasInc(name)||!!learnedStep(name);
+/* step for this exercise, in display units: what you set > what the app learned > a sensible default */
+function stepFor(name){const v=incs()[incKey(name)];if(v!=null)return r1(toDisp(v));const l=learnedStep(name);if(l)return l;return U()==='lb'?incDefaultKg(name)*2:incDefaultKg(name)}
 /* move a weight (display units) by k steps. A set jump (e.g. 7 kg) adds on top of the current weight; the default snaps to clean numbers */
-function stepFrom(name,cur,dir,k=1){const st=stepFor(name);if(hasInc(name))return Math.max(0,r1(cur+dir*st*k));const v=cur/st,n=dir>0?Math.floor(v+1e-9)+k:Math.ceil(v-1e-9)-k;return Math.max(0,r1(n*st))}
+function stepFrom(name,cur,dir,k=1){const st=stepFor(name);if(customStep(name))return Math.max(0,r1(cur+dir*st*k));const v=cur/st,n=dir>0?Math.floor(v+1e-9)+k:Math.ceil(v-1e-9)-k;return Math.max(0,r1(n*st))}
 /* put any weight (display units) on this exercise's real weight steps */
-function snapW(name,w,ref){const st=stepFor(name);if(!(st>0)||!isFinite(w))return w;const base=hasInc(name)&&ref!=null?ref:0;return Math.max(0,r1(base+Math.round((w-base)/st)*st))}
+function snapW(name,w,ref){const st=stepFor(name);if(!(st>0)||!isFinite(w))return w;const base=customStep(name)&&ref!=null?ref:0;return Math.max(0,r1(base+Math.round((w-base)/st)*st))}
 /* about pct lighter, on real steps (kg in, kg out). If one step is already more than that, keep the weight */
-function lighterKg(name,kg,pct){const st=stepFor(name),cur=r1(toDisp(kg));if(!hasInc(name))return roundStepKg(kg*(1-pct),'down',name);const k=Math.round(cur*pct/st+1e-9);return fromDisp(Math.max(0,r1(cur-k*st)))}
+function lighterKg(name,kg,pct){const st=stepFor(name),cur=r1(toDisp(kg));if(!customStep(name))return roundStepKg(kg*(1-pct),'down',name);const k=Math.round(cur*pct/st+1e-9);return fromDisp(Math.max(0,r1(cur-k*st)))}
 /* reps you'd likely get at a new weight, from a set you did (Epley) */
 const repsAt=(w,r,nw)=>nw>0?30*(e1rm(w,r)/nw-1):99;
 /* reps to reach at this weight before the next step is a sensible jump: land no lower than ~2 under the range */
@@ -742,6 +759,10 @@ const dayMins=d=>Math.round(d.exercises.reduce((a,e)=>a+e.sets*(40+(e.rest||S.se
 const repsTxt=e=>`${e.reps}${e.repsHi?'–'+e.repsHi:''}`;
 const sessVol=s=>s.exercises.reduce((a,e)=>a+e.sets.reduce((b,x)=>b+x.w*x.r,0),0);
 const sessSets=s=>s.exercises.reduce((a,e)=>a+e.sets.length,0);
+/* drop sets (marked d / drop) are extra work: they never count as your weight for progression */
+const mainSets=sets=>sets.filter(x=>!x.d&&!x.drop);
+const DROP_RX=/raise|curl|fly|pec deck|pushdown|push-down|extension|kickback|shrug|face pull|crossover/i, COMPOUND_RX=/press|row|pulldown|pull-down|pull-?up|chin|dip|squat|deadlift|lunge|bench/i;
+const dropOK=name=>DROP_RX.test(name||'')&&!/press|row|pulldown|dip/i.test(name||'');
 const e1rm=(w,r)=>w*(1+r/30);
 const curWeight=()=>{const w=[...S.profile.weights].sort((a,b)=>a.date<b.date?-1:1);return w.length?w[w.length-1].kg:null};
 
@@ -759,8 +780,8 @@ function lastPerf(name,before){
   const n=name.toLowerCase(), all=sorted();
   for(let i=all.length-1;i>=0;i--){
     const s=all[i]; if(before&&s.date>=before) continue;
-    const e=s.exercises.find(x=>x.name.toLowerCase()===n);
-    if(e&&e.sets.length) return {w:Math.max(...e.sets.map(x=>x.w)),sets:e.sets,date:s.date};
+    const e=s.exercises.find(x=>x.name.toLowerCase()===n), ms=e?mainSets(e.sets):[];
+    if(ms.length) return {w:Math.max(...ms.map(x=>x.w)),sets:ms,date:s.date};
   }
   return null;
 }
@@ -952,7 +973,7 @@ function adjustNext(e,j){
   }
   if(!dir){delete e.sug;return}
   if(dir==='down'&&cur===0){delete e.sug;return}
-  let nw=dir==='up'?stepFrom(e.name,cur,1):hasInc(e.name)?stepFrom(e.name,cur,-1):Math.floor(cur*0.95/st+1e-9)*st; if(dir==='down'&&nw>=cur)nw=stepFrom(e.name,cur,-1);
+  let nw=dir==='up'?stepFrom(e.name,cur,1):customStep(e.name)?stepFrom(e.name,cur,-1):Math.floor(cur*0.95/st+1e-9)*st; if(dir==='down'&&nw>=cur)nw=stepFrom(e.name,cur,-1);
   /* a big machine step mid-workout: only go up if you'd still get a sensible number of reps */
   if(dir==='up'&&repsAt(cur,s.r,nw)<Math.max(5,(tg.lo||goal)-2)){
     if(s.r>=goal+1){const nr=Math.min(s.r,(tg.hi||goal)+5);e.sug={w:s.w,r:nr,dir:'same',from:j,why:`${why}. The next step (+${st} ${U()}) is too big a jump mid-workout, so stay here and go for ${nr} reps`,src:'app',reps:true}}
@@ -962,8 +983,8 @@ function adjustNext(e,j){
 }
 function commit(a){
   const tgt=t=>t&&{w:t.w,r:t.r,kind:t.kind,why:t.why};
-  const exs=a.exercises.filter(e=>!e.skipped).map(e=>{const o={name:e.name,muscle:e.muscle,sets:e.sets.filter(s=>s.done).map(s=>{const o={w:s.w,r:s.r};if(s.feel)o.f=s.feel;if(s.rir!=null)o.t=s.rir;if(s.r0)o.tr=s.r0;if(s.strain!=null)o.st=s.strain;if(s.bonus)o.x=1;if(s.say)o.c=s.say;if(s.sig)o.sig=s.sig;return o})};
-    if(e.tg)o.target=tgt(e.tg); if(e.tgApp)o.appTarget=tgt(e.tgApp); o.step=stepFor(e.name); return o}).filter(e=>e.sets.length);
+  const exs=a.exercises.filter(e=>!e.skipped).map(e=>{const o={name:e.name,muscle:e.muscle,sets:e.sets.filter(s=>s.done).map(s=>{const o={w:s.w,r:s.r};if(s.feel)o.f=s.feel;if(s.rir!=null)o.t=s.rir;if(s.r0)o.tr=s.r0;if(s.strain!=null)o.st=s.strain;if(s.bonus)o.x=1;if(s.drop)o.d=1;if(s.say)o.c=s.say;if(s.sig)o.sig=s.sig;return o})};
+    if(e.tg)o.target=tgt(e.tg); if(e.tgApp)o.appTarget=tgt(e.tgApp); o.step=stepFor(e.name); if(e.late)o.late=1; return o}).filter(e=>e.sets.length);
   if(!exs.length) return null;
   const now=Date.now(), last=a.lastAt||a.started||now;
   /* if Save was tapped long after the last set, end the workout a few minutes after that set */
@@ -1201,10 +1222,12 @@ function dots(e){return `<span class="dots" aria-label="${e.sets.filter(x=>x.don
 function exCard(e,i){
   const all=e.sets.every(x=>x.done), dn=e.sets.filter(x=>x.done);
   if(!isOpen(e)||e.skipped){
-    const sub=e.skipped?'Skipped':all?`${dn.length} sets · ${fmtVol(dn.reduce((a,x)=>a+x.w*x.r,0))} ${U()}`:`${targetText(e)} · ${e.sets.length} sets`;
+    const md=mainSets(dn), top=md.length?md.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a):null, nd=dn.length-md.length;
+    const sub=e.skipped?'Skipped':all&&top?`${md.length} sets · best ${fmtW(top.w)} ${U()} × ${top.r}${nd?` · ${nd} drop${nd>1?'s':''}`:''}`:`${e.later&&!all?'Later · ':''}${targetText(e)} · ${e.sets.length} sets`;
+    const dropLink=all&&!e.skipped&&dropOK(e.name)&&S.active.lastDone===e.id?`<button class="link tap" style="flex:none" data-a="addDrop" data-i="${i}">+ Drop</button>`:'';
     return `<section class="card exc ${all?'done':''} ${e.skipped?'skipped':''}" id="ex-${e.id}"><div class="exc-row">${mediaThumb(e.name,'sm')}
       <button class="exc-main tap" data-a="openEx" data-id="${e.id}" aria-expanded="false"><span class="exc-n">${esc(e.name)}</span><span class="exc-s tn">${all?`<span class="c-lime">${I('check',13)}</span> `:''}${esc(sub)}</span></button>
-      ${e.skipped?`<button class="link tap" data-a="skip" data-i="${i}">Undo</button>`:dots(e)}</div></section>`;
+      ${e.skipped?`<button class="link tap" data-a="skip" data-i="${i}">Undo</button>`:dropLink||dots(e)}</div></section>`;
   }
   const lp=lastPerf(e.name,todayISO()), c=curIdx(e), s=e.sets[c];
   const nx=e.sug?e.sets.findIndex((x,k)=>k>e.sug.from&&!x.done):-1;
@@ -1212,18 +1235,18 @@ function exCard(e,i){
   if(ui.busy['set:'+e.id]) note=`<div class="note ai"><span class="coach-ic sm">${I('coach',12)}</span>Coach is reading that set…</div>`;
   else if(e.sug&&nx>=0&&(e.sug.src==='ai'||Math.abs(e.sug.w-e.sets[nx].w)>0.01||e.sug.reps&&e.sug.r!==e.sets[nx].r)) note=`<div class="note ${e.sug.src==='ai'?'ai':e.sug.dir}">${e.sug.src==='ai'?`<span class="coach-ic sm">${I('coach',12)}</span>`:''}<span>${esc(e.sug.why)}</span></div>`;
   return `<section class="card ex ${all?'allDone':''}" id="ex-${e.id}">
-   <div class="ex-head">${mediaThumb(e.name)}<button class="nm exc-main tap" data-a="openEx" data-id="${e.id}" aria-expanded="true"><h3>${esc(e.name)}</h3><span class="mu">${mdot(e.muscle)}${esc(e.muscle)}${lp?` · last ${fmtW(lp.w)} × ${lp.sets.map(x=>x.r).join(',')}`:''}</span></button><button class="link plain tap" data-a="skip" data-i="${i}">Skip</button></div>
+   <div class="ex-head">${mediaThumb(e.name)}<button class="nm exc-main tap" data-a="openEx" data-id="${e.id}" aria-expanded="true"><h3>${esc(e.name)}</h3><span class="mu">${mdot(e.muscle)}${esc(e.muscle)}${lp?` · last ${fmtW(lp.w)} × ${lp.sets.map(x=>x.r).join(',')}`:''}</span></button><div class="ex-acts">${e.sets.some(x=>x.done)||!nextOpenAfter(i)?'':`<button class="link plain tap" data-a="later" data-i="${i}" aria-label="Machine busy: do ${esc(e.name)} later">Later</button>`}<button class="link plain tap" data-a="skip" data-i="${i}">Skip</button></div></div>
    ${targetLine(e,i)}
    <div class="steppers">
-    <div><div class="stp-l">Weight (${U()}) · set ${c+1} · <button class="link plain tap stp-inc" data-a="openInc" data-n="${esc(e.name)}" aria-label="Weight jump for ${esc(e.name)}: ${stepFor(e.name)} ${U()}. Change">±${stepFor(e.name)}</button></div><div class="stp" id="sw-${e.id}"><button class="tap" data-a="stepW" data-i="${i}" data-d="-1" aria-label="Less weight">${I('minus',18)}</button><input id="w-${e.id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-num="dec" data-c="setW" data-i="${i}" value="${toDisp(s.w).toFixed(1)}" aria-label="Weight for set ${c+1}"><button class="tap" data-a="stepW" data-i="${i}" data-d="1" aria-label="More weight">${I('plus',18)}</button></div></div>
+    <div><div class="stp-l">Weight (${U()}) · set ${c+1} · <button class="link plain tap stp-inc" data-a="openInc" data-n="${esc(e.name)}" aria-label="Weight jump for ${esc(e.name)}: ${stepFor(e.name)} ${U()}${!hasInc(e.name)&&learnedStep(e.name)?', learned from your logs':''}. Change">±${stepFor(e.name)}${!hasInc(e.name)&&learnedStep(e.name)?' · learned':''}</button></div><div class="stp" id="sw-${e.id}"><button class="tap" data-a="stepW" data-i="${i}" data-d="-1" aria-label="Less weight">${I('minus',18)}</button><input id="w-${e.id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-num="dec" data-c="setW" data-i="${i}" value="${toDisp(s.w).toFixed(1)}" aria-label="Weight for set ${c+1}"><button class="tap" data-a="stepW" data-i="${i}" data-d="1" aria-label="More weight">${I('plus',18)}</button></div></div>
     <div><div class="stp-l">Reps</div><div class="stp" id="sr-${e.id}"><button class="tap" data-a="stepR" data-i="${i}" data-d="-1" aria-label="Fewer reps">${I('minus',18)}</button><input id="r-${e.id}" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="setR" data-i="${i}" value="${s.r}" aria-label="Reps for set ${c+1}"><button class="tap" data-a="stepR" data-i="${i}" data-d="1" aria-label="More reps">${I('plus',18)}</button></div></div>
    </div>
    <div class="sets">${e.sets.map((x,j)=>`<div class="set ${j===c?'cur':''} ${x.done?'done':''}" data-a="pickSet" data-i="${i}" data-j="${j}">
-     <span class="n">${x.bonus?'Extra':'Set '+(j+1)}</span><span class="w">${fmtW(x.w)} ${U()} × ${x.r}${x.done?(x.feel?` <span class="feelt">${{easy:'Easy',good:'Good',hard:'Hard'}[x.feel]}</span>`:''):x.rir!=null?` <span class="rir ${x.rir===0?'fail':''}">${rirText(x.rir)}</span>`:''}</span>
+     <span class="n">${x.drop?'↳ Drop':x.bonus?'Extra':'Set '+(j+1-e.sets.slice(0,j).filter(y=>y.drop).length)}</span><span class="w">${fmtW(x.w)} ${U()} × ${x.r}${x.done?(x.feel?` <span class="feelt">${{easy:'Easy',good:'Good',hard:'Hard'}[x.feel]}</span>`:''):x.rir!=null?` <span class="rir ${x.rir===0?'fail':''}">${rirText(x.rir)}</span>`:''}</span>
      ${j===nx&&(Math.abs(e.sug.w-x.w)>0.01||(e.sug.src==='ai'||e.sug.reps)&&e.sug.r!==x.r)?`<button class="sug ${e.sug.src==='ai'?'ai':e.sug.dir==='same'?'up':e.sug.dir} tap" data-a="useSug" data-i="${i}" aria-label="Use ${fmtW(e.sug.w)} ${U()} × ${e.sug.r||x.r} for the remaining sets">${e.sug.src==='ai'?'★':e.sug.dir==='up'?'↑':e.sug.dir==='same'?'=':'↓'} ${fmtW(e.sug.w)}${e.sug.src==='ai'||e.sug.reps?` × ${e.sug.r}`:''}</button>`:'<span></span>'}
      <button class="check tap" data-a="tick" data-i="${i}" data-j="${j}" aria-pressed="${x.done}" aria-label="Mark set ${j+1} done">${I('check',18)}</button></div>`).join('')}</div>
    ${note}
-   <div class="ex-foot"><button class="link tap" data-a="addSet" data-i="${i}">+ Add set</button>${e.sets.some(x=>x.done)?'':`<button class="link plain tap" data-a="openSwap" data-i="${i}">Swap</button>`}${e.sets.length>1&&!e.sets.at(-1).done?`<button class="link plain tap" data-a="rmSet" data-i="${i}">Remove last</button>`:''}</div>
+   <div class="ex-foot"><button class="link tap" data-a="addSet" data-i="${i}">+ Add set</button>${dropOK(e.name)&&e.sets.length&&e.sets.at(-1).done&&mainSets(e.sets).every(x=>x.done)?`<button class="link tap" data-a="addDrop" data-i="${i}">+ Drop</button>`:''}${e.sets.some(x=>x.done)?'':`<button class="link plain tap" data-a="openSwap" data-i="${i}">Swap</button>`}${e.sets.length>1&&!e.sets.at(-1).done?`<button class="link plain tap" data-a="rmSet" data-i="${i}">Remove last</button>`:''}</div>
   </section>`;
 }
 function sessionCard(s){
@@ -1352,9 +1375,9 @@ function viewPlan(){
 const PUSH=['Chest','Shoulders','Triceps'], PULL=['Back','Biceps'];
 function liftSessions(name){
   const n=(name||'').toLowerCase(), out=[];
-  for(const s of sorted()){const e=s.exercises.find(x=>x.name.toLowerCase()===n);if(!e||!e.sets.length)continue;
-    const top=e.sets.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a);
-    out.push({date:s.date,w:top.w,r:top.r,e:e1rm(top.w,top.r),sets:e.sets,sid:s.id,muscle:e.muscle})}
+  for(const s of sorted()){const e=s.exercises.find(x=>x.name.toLowerCase()===n);if(!e)continue;const ms=mainSets(e.sets);if(!ms.length)continue;
+    const top=ms.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a);
+    out.push({date:s.date,w:top.w,r:top.r,e:e1rm(top.w,top.r),sets:ms,sid:s.id,muscle:e.muscle,late:!!e.late})}
   let best=-1; out.forEach(p=>{p.pr=best>=0&&p.e>best+1e-9;best=Math.max(best,p.e)});
   return out;
 }
@@ -1362,7 +1385,7 @@ function liftStatus(name){
   const L=liftSessions(name), n=L.length;
   if(n<3) return {key:'new',label:'New',why:`Status shows after 3 sessions (${n} so far)`,L};
   const e=L.map(x=>x.e), last=e[n-1], prev=e.slice(Math.max(0,n-4),n-1), avg=prev.reduce((a,b)=>a+b,0)/prev.length;
-  if(last<avg*0.95) return {key:'dropping',label:'Dropping',why:`Last session ${Math.round((1-last/avg)*100)}% below your recent average`,L};
+  if(last<avg*0.95&&!L[n-1].late) return {key:'dropping',label:'Dropping',why:`Last session ${Math.round((1-last/avg)*100)}% below your recent average`,L};
   const before=n>=4?Math.max(...e.slice(0,n-3)):e[0], recent=Math.max(...e.slice(n-3));
   if(recent>before*1.005) return {key:'progressing',label:'Progressing',why:`Estimated max up ${fmtW(recent-before)} ${U()} on your earlier best`,L};
   return {key:'stalled',label:'Stalled',why:'No better set in your last 3 sessions',L};
@@ -1686,6 +1709,7 @@ Rules:
 - Plain, direct words. No emoji, no hype, no exclamation marks.
 - If DATA.totalWorkoutsLogged is under 3, say the data is thin and keep advice general.
 - No medical advice. If a lift dropped sharply, suggest rest, and seeing a professional if there is pain.
+- Sets marked d:1 (or drop:true) are drop sets: extra lighter work after the last set. Count them as effort, never as the lift's weight or a sign of getting weaker. An exercise marked late:1 was done later than planned because a machine was busy, so a small dip there is not a regression.
 - Treat profile.protect as a hard limit (an injury or body part to protect): never suggest exercises that load it. If profile.goalDate is set, aim advice at what can be done by that date.`;
 function liftData(name,limit,from){
   const st=liftStatus(name), pe=planEx(name);
@@ -2262,6 +2286,7 @@ const SHEETS={
        ${x.error?`<span class="sm c-danger" style="line-height:1.45">${esc(x.error.msg)}${x.error.detail&&!String(x.error.msg).includes(String(x.error.detail).slice(0,40))?` (${esc(String(x.error.detail).slice(0,200))})`:''}</span>`:`<span class="sm" style="white-space:pre-wrap;line-height:1.5">${esc(flat(x.answer).slice(0,1500))}</span>`}</div>`).join(''):`<p class="muted" style="margin:0">Nothing yet. Ask Coach something and it shows up here.</p>`}</div>`},
   inc(){const n=ui.incName||'', cur=stepFor(n), u=U(), opts=u==='lb'?[2.5,5,10,15,20]:[1,1.25,2,2.5,4.5,5,7,10];
     return sheetHead(esc(n),'Weight jump')+`<div class="sheet-body"><p class="muted" style="margin:0;line-height:1.5">How much does the weight go up by on this machine or rack? The + and − buttons, your targets and Coach all use this, so suggestions are weights you can actually pick.</p>
+     ${!hasInc(n)&&learnedStep(n)?`<p class="sm" style="margin:0;line-height:1.5"><span class="c-lime">Learned from your logs: ${learnedStep(n)} ${u}.</span> Pick another if that’s wrong.</p>`:''}
      <div class="mchips">${opts.map(v=>`<button class="chip tap" aria-pressed="${Math.abs(v-cur)<0.01}" data-a="incPick" data-v="${v}">${v} ${u}</button>`).join('')}</div>
      <div><label class="flabel" for="incIn">Other (${u})</label><div class="row"><input id="incIn" class="field grow tn" type="text" inputmode="decimal" data-num="dec" enterkeyhint="done" autocomplete="off" value="${cur}"><button class="btn btn-primary tap" style="flex:none" data-a="incSave">Save</button></div></div>
      ${hasInc(n)?`<div><button class="link plain tap" data-a="incReset">Use the default (${U()==='lb'?incDefaultKg(n)*2:incDefaultKg(n)} ${u})</button></div>`:''}</div>`},
@@ -2307,6 +2332,8 @@ function updLine(){
   const sub=ui.updBusy?'Checking…':ready?`Build ${u.latest} is ready. It downloads, then tap Install. Your data stays.`:b?`Build ${b}${u&&u.checked?' · up to date':''}`:'Test copy (not from GitHub)';
   return `<div class="set-line"><div class="sl-t"><span>App version</span><span class="faint">${esc(sub)}</span></div>${ready?`<button class="btn btn-primary btn-sm tap" style="flex:none" data-a="updInstall">Update</button>`:`<button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="updCheck" ${ui.updBusy?'disabled':''}>Check</button>`}</div>`;
 }
+/* index to move an exercise to when its machine is busy: right after the next one you haven't finished */
+function nextOpenAfter(i){const a=S.active;if(!a)return 0;for(let k=i+1;k<a.exercises.length;k++){const x=a.exercises[k];if(!x.skipped&&x.sets.some(s=>!s.done))return k}return 0}
 function setInc(name,v){incs()[incKey(name)]=fromDisp(v);refreshDraft();closeSheet();render();buzz(15);toast(`${name}: goes up in ${v} ${U()} steps`)}
 function openSheet(name){
   const was=!!ui.sheet; ui.sheet=name; const r=$('#sheetRoot'); r.classList.remove('closing');
@@ -2401,8 +2428,13 @@ function renderDock(){
   const kind=h?(h.startsWith('<div class="dock-btn')?'btn':'w'):'';
   if(dock.dataset.kind!==kind){dock.innerHTML=h;dock.dataset.kind=kind}else if(h)patch(dock,h);
   $('#shade').classList.toggle('on',shade);
-  requestAnimationFrame(()=>{const el=dock.firstElementChild;const hgt=el?el.offsetHeight:0;$('#app').style.paddingBottom=(Math.min(hgt,140)+130)+'px'});
+  requestAnimationFrame(padForDock);
 }
+/* leave room for the whole bottom panel (rest timer, Coach note…) so the last exercise can always scroll above it */
+function padForDock(){const el=$('#dock').firstElementChild, open=ui.view==='workout'&&(ui.dockOpen||!!ui.finish);
+  let h=el?el.offsetHeight:0; if(open)h=Math.min(h,ui.dockPad||h); else ui.dockPad=h;
+  $('#app').style.paddingBottom=(h+130)+'px'}
+if(window.ResizeObserver){const ro=new ResizeObserver(()=>padForDock());const watch=()=>{const el=$('#dock').firstElementChild;if(el&&el!==watch.el){if(watch.el)ro.unobserve(watch.el);ro.observe(el);watch.el=el}};new MutationObserver(watch).observe($('#dock'),{childList:true});watch()}
 
 /* ---------- actions ---------- */
 const act={
@@ -2426,14 +2458,22 @@ const act={
   stepR(d){const e=S.active.exercises[d.i],c=curIdx(e),s=e.sets[c];if(s.pr==null&&!s.done)s.pr=s.r;s.r=clamp(s.r+(+d.d),1,100);if(!s.done)s.edited=true;propR(e,c);render();bump('sr-'+e.id)},
   pickSet(d){const e=S.active.exercises[d.i];ui.curSet[e.id]=+d.j;render()},
   tick(d){const a=S.active,e=a.exercises[d.i],s=e&&e.sets[d.j];if(!s)return;s.done=!s.done;
-    if(s.done){if(!a.started){a.ready=a.ready||'normal';a.started=Date.now();ui.sel=todayISO();ui.finish=null;wakeOn()}a.lastAt=Date.now();s.r0=s.r0||e.tg&&e.tg.r;s.doneAt=Date.now();recordSignals(e,+d.j);adjustNext(e,+d.j);ui.feel={eid:e.id,j:+d.j};queueAiSet(e,+d.j);
+    if(s.done){if(!a.started){a.ready=a.ready||'normal';a.started=Date.now();ui.sel=todayISO();ui.finish=null;wakeOn()}a.lastAt=Date.now();s.doneAt=Date.now();if(!s.drop){s.r0=s.r0||e.tg&&e.tg.r;recordSignals(e,+d.j);adjustNext(e,+d.j);ui.feel={eid:e.id,j:+d.j};queueAiSet(e,+d.j)}
       const all=e.sets.every(x=>x.done), every=a.exercises.filter(x=>!x.skipped).every(x=>x.sets.every(y=>y.done));
       buzz(every?[30,60,30,60,60]:all?[20,50,40]:20);
-      const nx=e.sets.findIndex(x=>!x.done);if(nx>=0)ui.curSet[e.id]=nx;else{delete ui.curSet[e.id];ui.openEx=null;setTimeout(()=>{const f=focusId();if(f&&f!==e.id){const el=document.getElementById('ex-'+f);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})}},450)}
+      const nx=e.sets.findIndex(x=>!x.done);if(nx>=0)ui.curSet[e.id]=nx;else{delete ui.curSet[e.id];ui.openEx=null;a.lastDone=e.id;setTimeout(()=>{const f=focusId();if(f&&f!==e.id){const el=document.getElementById('ex-'+f);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})}},450)}
       if(every){ui.restEnd=0;ui.finish='confirm';setTimeout(()=>toast('All sets done. Save when ready'),150)}
       else{ui.restTotal=(e.rest||S.settings.rest)*1000;ui.restEnd=Date.now()+ui.restTotal;if(S.active.win)S.active.win.plan=ui.restTotal;if(all)setTimeout(()=>toast(`${e.name} done`),150)}}
     else{buzz(8);ui.restEnd=0;delete s.feel;delete s.strain;if(e.sug&&e.sug.from>=+d.j)delete e.sug;if(ui.feel&&ui.feel.eid===e.id)ui.feel=null}
     render()},
+  addDrop(d){const e=S.active.exercises[+d.i];if(!e)return;const l=e.sets.at(-1);if(!l)return;
+    const cur=r1(toDisp(l.w)),st=stepFor(e.name),k=Math.max(1,Math.round(cur*0.25/st)),w=customStep(e.name)?r1(cur-k*st):stepFrom(e.name,cur,-k);
+    if(!(w>0)){toast('Already at the lightest weight');return}
+    e.sets.push({w:fromDisp(w),r:Math.max(4,Math.round(l.r*0.75)),rir:0,drop:true,done:false});ui.curSet[e.id]=e.sets.length-1;ui.openEx=e.id;buzz(15);render();
+    setTimeout(()=>{const el=document.getElementById('ex-'+e.id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},60)},
+  later(d){const a=S.active,i=+d.i,j=nextOpenAfter(i);if(!j)return;const [e]=a.exercises.splice(i,1);e.later=true;
+    a.exercises.splice(j,0,e);ui.openEx=null;
+    if(e.tg&&e.tg.kind!=='new'&&COMPOUND_RX.test(e.name)){const r=Math.max(1,e.tg.r-1);e.tg={...e.tg,r,why:e.tg.why+'. Doing it later today, so one rep fewer is fine'};e.sets.forEach(x=>{if(!x.done&&!x.drop){x.r=r;x.r0=r}})}buzz(15);toast(`${e.name} moved after ${a.exercises[j-1].name}`);render()},
   addSet(d){const e=S.active.exercises[d.i],l=e.sets[e.sets.length-1];e.sets.push({w:l.w,r:l.r,done:false});ui.curSet[e.id]=e.sets.length-1;render()},
   rmSet(d){const e=S.active.exercises[d.i];if(e.sets.length>1)e.sets.pop();delete ui.curSet[e.id];render()},
   skip(d){const e=S.active.exercises[d.i];e.skipped=!e.skipped;render()},
@@ -2465,7 +2505,8 @@ const act={
     const d=S.plan[ui.planDay], isNew=ui.editEx==null;
     const iv=parseFloat(($('#exInc')&&$('#exInc').value||'').replace(',','.'));
     if(iv>0&&iv<=50&&(hasInc(name)||Math.abs(iv-stepFor(name))>0.01))incs()[incKey(name)]=fromDisp(iv);
-    if(isNew) d.exercises.push({id:uid(),...obj}); else Object.assign(d.exercises[ui.editEx],obj);
+    /* best order: big multi-joint lifts first while you're fresh, then single-muscle work */
+    if(isNew){const ne={id:uid(),...obj},fi=COMPOUND_RX.test(name)?d.exercises.findIndex(x=>!COMPOUND_RX.test(x.name)):-1;if(fi>=0)d.exercises.splice(fi,0,ne);else d.exercises.push(ne)} else Object.assign(d.exercises[ui.editEx],obj);
     refreshDraft();closeSheet();render();buzz(15);toast(isNew?`Added ${name}`:'Saved');
   },
   mvEx(d){const ex=S.plan[ui.planDay].exercises,i=+d.i,j=i+(+d.d);if(j<0||j>=ex.length)return;[ex[i],ex[j]]=[ex[j],ex[i]];refreshDraft();render()},
