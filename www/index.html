@@ -1002,7 +1002,8 @@ function commit(a){
   const s={id:uid(),date:a.date,dayId:a.dayId,dayName:a.dayName,start:a.started||now,end:a.date===todayISO()?Math.min(now,last+8*60000):last,exercises:exs};if(a.pump&&Object.keys(a.pump).length)s.pump={...a.pump};if(a.check)s.check=a.check;
   if(a.ready)s.ready=a.ready; if(a.phase)s.phase=a.phase; if(a.say)s.coachSaid=a.say;
   const sk=a.exercises.filter(e=>e.skipped).map(e=>e.name); if(sk.length)s.skipped=sk;
-  S.sessions.push(s); if(S.nextW) exs.forEach(e=>delete S.nextW[e.name.toLowerCase()]); return s;
+  decClose(a,s);
+  S.sessions.push(s); ev('workout-saved',`${s.dayName}: ${sessSets(s)} sets, ${Math.round((s.end-s.start)/60000)} min`); if(S.nextW) exs.forEach(e=>delete S.nextW[e.name.toLowerCase()]); return s;
 }
 function sync(){
   const t=todayISO();
@@ -1657,7 +1658,7 @@ const askText=messages=>{const u=[...messages].reverse().find(m=>m.role==='user'
 /* does a Coach message mention only the weight the app is using? */
 function sayMatches(say,w){const m=[...String(say).matchAll(/(\d+(?:\.\d+)?)\s*(?:kg|kgs|lb|lbs)\b/gi)];return m.every(x=>Math.abs(parseFloat(x[1])-w)<0.01)}
 /* record whether the app actually used the last Coach answer of this kind */
-function markUsed(kind,v){const L=S.coachLog||[];for(let i=L.length-1;i>=0&&i>=L.length-6;i--)if(L[i].kind===kind&&L[i].used==null){L[i].used=v;save();return}}
+function markUsed(kind,v){if(String(v).startsWith('no'))ev('ai-rejected',`${kind}: ${v}`);const L=S.coachLog||[];for(let i=L.length-1;i>=0&&i>=L.length-6;i--)if(L[i].kind===kind&&L[i].used==null){L[i].used=v;save();return}}
 const errObj=e=>({code:e&&e.code||'other',msg:e&&e.message||String(e),detail:e&&e.detail||null});
 function coachJSON(name,schema,messages,{effort='medium'}={}){
   return queued(async()=>{
@@ -1689,7 +1690,7 @@ function coachJSON(name,schema,messages,{effort='medium'}={}){
         const retry=e instanceof SyntaxError||e.code==='bad';
         if(retry&&attempt<(isClaude()?1:2)) continue;
         const ce=e instanceof SyntaxError?new CoachErr('bad','Coach couldn’t answer this time.',{detail:String(e.message||e)}):e;
-        if(ce.code!=='cancel')clog({kind:name,ask:askText(messages),error:errObj(ce),attempt:attempt+1});
+        if(ce.code!=='cancel'){clog({kind:name,ask:askText(messages),error:errObj(ce),attempt:attempt+1});ev('ai-error',`${name}: ${ce.message||ce}`)}
         throw ce;
       }
     }
@@ -2044,6 +2045,7 @@ function runNextSet(e,j){
     let say=typeof out.say==='string'&&numbersOK(out.say,data)?out.say.trim():'';
     if(say&&out.decision!=='done'&&!sayMatches(say,out.weight))say=`Next set ${fmtW(out.weight)} ${U()} × ${out.reps}.`;
     if(say)s.say=say.slice(0,200);
+    decAi(e,j,out,say);
     const ok=planCheck(e.name,out.weight,out.reps,r1(toDisp(s.w)))&&Number.isInteger(out.effort)&&out.effort>=0&&out.effort<=5&&(out.effort>0||failureOK(e.name));
     const rest=Number.isInteger(out.rest)?clamp(out.rest,30,300):null;
     const setRest=()=>{if(rest){e.rest=rest;const end=t0+rest*1000;if(end>Date.now()&&ui.restEnd){ui.restTotal=rest*1000;ui.restEnd=end;if(S.active.win)S.active.win.plan=rest*1000}}};
@@ -2374,10 +2376,14 @@ const hhmm=t=>{if(!t)return '';const d=new Date(t);return `${String(d.getHours()
 const flatTxt=v=>typeof v==='string'||typeof v==='number'?String(v):Array.isArray(v)?v.map(flatTxt).filter(Boolean).join('\n'):v&&typeof v==='object'?Object.values(v).map(flatTxt).filter(Boolean).join(' · '):'';
 const SHEET_TABS={
   Workouts:['ID','Date','Week of','Day','Start','End','Minutes','Sets','Drop sets','Volume (kg)','Ready','Sleep','Energy','Joint pain','Block week','Skipped','Coach said','App build'],
-  Sets:['ID','Date','Week of','Day','Exercise','Muscle','Set','Weight (kg)','Reps','Target reps','Reps left (aim)','Felt','Drop set','Extra set','Strain','Rest taken (s)','Coach note','Weight step'],
-  Targets:['ID','Date','Week of','Exercise','Target','Type','Why','Rule used','Last time','Rep range','Weight step','Reps before next jump','Lift status','Block week','Coach changed it from','Best set done','Hit target'],
+  Sets:['ID','Date','Week of','Day','Exercise','Muscle','Set','Weight (kg)','Reps','Target reps','Reps left (aim)','Felt','Drop set','Extra set','Strain','Rest taken (s)','Coach note','Weight step','Done at','Set time (s)','Sec per rep','Rest planned (s)','Rest over/under (s)','You changed weight','You changed reps','Off app (s)','Taps','Min into workout'],
+  Targets:['ID','Date','Week of','Exercise','Target','Type','Why','Rule used','Last time','Rep range','Weight step','Reps before next jump','Lift status','Block week','Coach changed it from','Best set done','Hit target','App target','AI target','Hit app target','Hit AI target'],
   Coach:['ID','Date','Time','Kind','Question / task','Answer','Used by app','Error','Provider','Model','Full prompt','Raw answer'],
-  Body:['ID','Date','Weight (kg)']
+  Body:['ID','Date','Weight (kg)'],
+  Decisions:['ID','Date','Time','Exercise','Set','Weight','Reps','Target reps','Reps left (aim)','Felt','Strain','Rest taken (s)','Set time (s)','Min into workout','Ready','Block week','App says','App weight','App reps','App why','AI says','AI weight','AI reps','AI rest (s)','AI message','You did','Your weight','Your reps','App and AI agree','App reps off by','AI reps off by','Followed app','Followed AI'],
+  Events:['ID','Date','Time','Type','Detail','App build'],
+  Model:['ID','Type','Name','Sessions','First','Last','Best set','Est. max now (kg)','Est. max 4 wks ago','Change %','Change % per week','Avg reps lost per set','Median rest (s)','Median sec per rep','Weight step','Targets hit / sets per week','Avg days between','Status','Updated'],
+  Scorecard:['ID','Week of','Set decisions','AI answered','Agree %','App reps off (avg)','AI reps off (avg)','Followed app %','Followed AI %','Your edits','Coach errors','Coach answers rejected','App errors']
 };
 const COACH_KIND={chat:'You asked',trainer:'Next set',session:'Workout plan',targets:'Today’s targets',report:'Coach report',recap:'Workout recap',checkin:'Weekly check-in',fix:'Fix for a lift',review:'Split review',why:'Why this target'};
 const shortAsk=t=>{t=String(t||'');const m=t.match(/^(.*?[.?!])(\s|$)/);return (m?m[1]:t).slice(0,200)};
@@ -2399,21 +2405,99 @@ function sessionRows(s){
   const W=[[s.id,s.date,wk,s.dayName,hhmm(s.start),hhmm(s.end),mins,all.length-drops,drops,Math.round(all.reduce((a,x)=>a+x.w*x.r,0)),s.ready||'',ck.sleep||'',ck.energy||'',ck.joint?'yes':'',ph,(s.skipped||[]).join(', '),s.coachSaid||'',myBuild()||'']];
   const SE=[], T=[];
   s.exercises.forEach((e,ei)=>{let n=0;
-    e.sets.forEach((x,j)=>{if(!x.d)n++;SE.push([`${s.id}-${ei}-${j}`,s.date,wk,s.dayName,e.name,e.muscle,x.d?`${n} drop`:n,x.w,x.r,x.tr||'',x.t!=null?x.t:'',x.f||'',!!x.d,!!x.x,x.st!=null?x.st:'',x.sig&&x.sig.restTakenSec!=null?x.sig.restTakenSec:'',x.c||'',e.step||''])});
+    e.sets.forEach((x,j)=>{if(!x.d)n++;SE.push([`${s.id}-${ei}-${j}`,s.date,wk,s.dayName,e.name,e.muscle,x.d?`${n} drop`:n,x.w,x.r,x.tr||'',x.t!=null?x.t:'',x.f||'',!!x.d,!!x.x,x.st!=null?x.st:'',x.sig&&x.sig.restTakenSec!=null?x.sig.restTakenSec:'',x.c||'',e.step||'',...(()=>{const g=x.sig||{},v=k=>g[k]!=null?g[k]:'';return [v('doneAt'),v('setSec'),v('secPerRep'),v('restPlannedSec'),v('restOverrunSec'),g.userWeightChange||'',g.userRepChange||'',v('offAppSec'),v('inAppTaps'),v('minutesIntoWorkout')]})()])});
     const tg=e.target; if(!tg)return; const c=tg.calc||{}, ms=e.sets.filter(x=>!x.d), top=ms.length?ms.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a):null;
     const hit=tg.kind==='new'?'':top&&tg.r?(top.w>=tg.w-1e-9&&top.r>=tg.r?'yes':'no'):'';
-    T.push([`${s.id}-${ei}`,s.date,wk,e.name,tg.kind==='new'?'Find your weight':`${fmtW(tg.w)} kg × ${tg.r}`,tg.kind,tg.why||'',c.rule||'',c.last||'',c.range||'',c.step||'',c.needBeforeJump||'',c.status||'',c.phase||'',e.appTarget?`${fmtW(e.appTarget.w)} kg × ${e.appTarget.r} (${e.appTarget.why||''})`:'',top?`${fmtW(top.w)} kg × ${top.r}`:'',hit])});
+    T.push([`${s.id}-${ei}`,s.date,wk,e.name,tg.kind==='new'?'Find your weight':`${fmtW(tg.w)} kg × ${tg.r}`,tg.kind,tg.why||'',c.rule||'',c.last||'',c.range||'',c.step||'',c.needBeforeJump||'',c.status||'',c.phase||'',e.appTarget?`${fmtW(e.appTarget.w)} kg × ${e.appTarget.r} (${e.appTarget.why||''})`:'',top?`${fmtW(top.w)} kg × ${top.r}`:'',hit,...(()=>{const ap=e.appTarget||tg, ai=e.appTarget?tg:null, h=t=>!t||t.kind==='new'||!top?'':(top.w>=t.w-1e-9&&top.r>=t.r?'yes':'no');return [ap.kind==='new'?'Find your weight':`${fmtW(ap.w)} kg × ${ap.r}`,ai?`${fmtW(ai.w)} kg × ${ai.r}`:'',h(ap),ai?h(ai):'']})()])});
   return {Workouts:W,Sets:SE,Targets:T};
 }
-const SYNC_V=2; /* bump when sheet columns change: everything is re-sent once */
+/* ======== learning data: every decision made twice (app vs AI), what you did, and how it went ======== */
+function ev(type,detail){try{if(!Array.isArray(S.events))S.events=[];S.events.push({at:Date.now(),date:todayISO(),type,detail:String(detail||'').slice(0,500),build:myBuild()||''});if(S.events.length>3000)S.events.splice(0,S.events.length-3000)}catch(e){}}
+window.addEventListener('error',e=>{ev('js-error',`${e.message||''} @${(e.filename||'').split('/').pop()}:${e.lineno||''}`);try{save()}catch(_){}});
+window.addEventListener('unhandledrejection',e=>{ev('js-error',`promise: ${String(e.reason&&e.reason.message||e.reason).slice(0,300)}`)});
+function DEC(){if(!Array.isArray(S.decisions))S.decisions=[];return S.decisions}
+const decFind=(e,j)=>{const a=S.active;return DEC().find(d=>d.key===(a&&a.started)&&d.eid===e.id&&d.j===j)};
+function decLog(e,j){try{
+  const a=S.active, s=e.sets[j], nx=e.sets.findIndex((x,k)=>k>j&&!x.done&&!x.drop), g=e.sug&&e.sug.src!=='ai'&&e.sug.from===j?e.sug:null, ph=phaseNow();
+  const app=nx<0?{action:'done',why:'Planned sets finished'}:{action:'continue',w:r1(toDisp(g?g.w:e.sets[nx].w)),r:g&&g.reps?g.r:e.sets[nx].r,why:g?g.why:'Keep the plan'};
+  if(g&&g.w!=null&&nx>=0&&!g.reps)app.r=e.sets[nx].r;
+  DEC().push({id:uid(),key:a.started,at:Date.now(),date:todayISO(),eid:e.id,ex:e.name,j,setNo:e.sets.slice(0,j+1).filter(x=>!x.drop).length,
+    sit:{w:r1(toDisp(s.w)),r:s.r,tr:s.r0||null,rir:s.rir!=null?s.rir:null,strain:s.strain!=null?s.strain:null,rest:s.sig&&s.sig.restTakenSec,setSec:s.sig&&s.sig.setSec,min:s.sig&&s.sig.minutesIntoWorkout,ready:a.ready||'',block:ph.label,sleep:a.check&&a.check.sleep||'',energy:a.check&&a.check.energy||''},
+    app});
+  if(DEC().length>4000)DEC().splice(0,DEC().length-4000);
+}catch(err){ev('js-error','decLog: '+err.message)}}
+function decApp(e,j,app){const d=decFind(e,j);if(d)d.app=app}
+function decAi(e,j,out,say){const d=decFind(e,j);if(!d)return;d.ai={action:out.decision,w:out.decision==='done'?null:out.weight,r:out.decision==='done'?null:out.reps,rest:out.rest,effort:out.effort,say:say||out.say||''}}
+/* when a set is ticked, it's what you "did" after the previous set's decision */
+function decFill(e,j){try{
+  const s=e.sets[j]; let k=j-1; while(k>=0&&!e.sets[k].done)k--; if(k<0)return;
+  const d=decFind(e,k); if(!d||d.did)return; d.did={action:s.drop?'drop':s.bonus?'extra':'continue',w:r1(toDisp(s.w)),r:s.r};
+}catch(err){}}
+function decClose(a,sess){
+  DEC().forEach(d=>{if(d.key!==a.started)return;d.sid=sess.id;const e=a.exercises.find(x=>x.id===d.eid),s=e&&e.sets[d.j];if(s){d.sit.feel=s.feel||'';if(s.strain!=null)d.sit.strain=s.strain}if(!d.did)d.did={action:'stopped'}});
+}
+/* how well did a call predict what you did? (reps off, when you used that weight) */
+function decScore(d){
+  const did=d.did||{}, sc={};
+  const err=c=>c&&c.action==='continue'&&did.action&&did.w!=null&&c.w!=null&&Math.abs(did.w-c.w)<0.01?Math.abs(did.r-c.r):null;
+  sc.appErr=err(d.app); sc.aiErr=d.ai?err({...d.ai,action:d.ai.action==='extra'?'continue':d.ai.action}):null;
+  const same=(c)=>c&&(c.action==='done'?did.action==='stopped':did.action&&did.action!=='stopped'&&c.w!=null&&Math.abs(did.w-c.w)<0.01);
+  sc.followedApp=d.app?!!same(d.app):null; sc.followedAi=d.ai?!!same(d.ai):null;
+  sc.agree=d.ai?(d.app.action==='done')===(d.ai.action==='done')&&(d.app.action==='done'||(d.ai.w!=null&&Math.abs(d.app.w-d.ai.w)<0.01&&Math.abs(d.app.r-d.ai.r)<=1)):null;
+  return sc;
+}
+/* your personal numbers, learned from your logs */
+function modelRows(){
+  const names=[...new Set(S.sessions.filter(s=>!s.demo).flatMap(s=>s.exercises.map(e=>e.name)))], t=todayISO(), rows=[];
+  names.forEach(n=>{
+    const L=liftSessions(n).filter(x=>x.e>0); if(!L.length)return; const last=L.at(-1), first=L[0];
+    const old=[...L].reverse().find(x=>diffDays(x.date,t)>=28)||first, days=Math.max(7,diffDays(old.date,last.date));
+    const ch=old.e>0?(last.e/old.e-1)*100:0;
+    const drops=[], rests=[], spr=[]; let tg=0,hit=0;
+    S.sessions.forEach(s=>s.exercises.filter(e=>e.name===n).forEach(e=>{const ms=e.sets.filter(x=>!x.d);
+      for(let i=1;i<ms.length;i++)if(Math.abs(ms[i].w-ms[i-1].w)<0.01)drops.push(ms[i-1].r-ms[i].r);
+      e.sets.forEach(x=>{if(x.sig&&x.sig.restTakenSec!=null&&x.sig.restTakenSec<900)rests.push(x.sig.restTakenSec);if(x.sig&&x.sig.secPerRep)spr.push(x.sig.secPerRep)});
+      if(e.target&&e.target.kind!=='new'&&e.target.r){tg++;const top=ms.reduce((a,b)=>!a||b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a,null);if(top&&top.w>=e.target.w-1e-9&&top.r>=e.target.r)hit++}}));
+    const med=a=>{if(!a.length)return '';const b=[...a].sort((x,y)=>x-y);return b[Math.floor(b.length/2)]};
+    const gaps=L.slice(1).map((x,i)=>diffDays(L[i].date,x.date));
+    rows.push(['ex:'+n,'Exercise',n,L.length,first.date,last.date,`${fmtW(Math.max(...L.map(x=>x.w)))} kg × ${L.reduce((m,x)=>x.w>=m.w?x:m,L[0]).r}`,Math.round(last.e*10)/10,Math.round(old.e*10)/10,Math.round(ch*10)/10,Math.round(ch/days*7*10)/10,
+      drops.length?Math.round(drops.reduce((a,b)=>a+b,0)/drops.length*10)/10:'',med(rests),med(spr),`${stepFor(n)} kg (${hasInc(n)?'you set it':learnedStep(n)?'learned':'default'})`,tg?Math.round(hit/tg*100)+'%':'',gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length*10)/10:'',liftStatus(n).label,t]);
+  });
+  VGROUPS.forEach(m=>{const ss=S.sessions.filter(s=>!s.demo&&s.exercises.some(e=>e.muscle===m)).map(s=>s.date).sort();if(!ss.length)return;
+    const gaps=ss.slice(1).map((d,i)=>diffDays(ss[i],d)).filter(g=>g>0), wk=S.sessions.filter(s=>diffDays(s.date,t)<14).reduce((a,s)=>a+s.exercises.filter(e=>e.muscle===m).reduce((b,e)=>b+e.sets.filter(x=>!x.d).length,0),0)/2;
+    rows.push(['mu:'+m,'Muscle',m,ss.length,ss[0],ss.at(-1),'','','','','','','','','',`target ${volTarget(m)??''} sets/wk, doing ${Math.round(wk*10)/10}`,gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length*10)/10:'','',t])});
+  return rows;
+}
+function scoreRows(){
+  const by={}; DEC().filter(d=>d.did).forEach(d=>{const w=weekStart(d.date);(by[w]=by[w]||[]).push(d)});
+  const evs=S.events||[];
+  return Object.keys(by).sort().map(w=>{const L=by[w].map(d=>({d,sc:decScore(d)}));
+    const pct=(f)=>{const v=L.map(f).filter(x=>x!=null);return v.length?Math.round(v.filter(Boolean).length/v.length*100):''};
+    const avg=(f)=>{const v=L.map(f).filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*100)/100:''};
+    const inWk=x=>weekStart(x.date)===w;
+    const sets=S.sessions.filter(s=>weekStart(s.date)===w).flatMap(s=>s.exercises.flatMap(e=>e.sets)), ov=sets.filter(x=>x.sig&&((x.sig.userWeightChange||0)!==0||(x.sig.userRepChange||0)!==0)).length;
+    return ['wk:'+w,w,L.length,L.filter(x=>x.d.ai).length,pct(x=>x.sc.agree),avg(x=>x.sc.appErr),avg(x=>x.sc.aiErr),pct(x=>x.sc.followedApp),pct(x=>x.sc.followedAi),ov,evs.filter(x=>inWk(x)&&x.type==='ai-error').length,evs.filter(x=>inWk(x)&&x.type==='ai-rejected').length,evs.filter(x=>inWk(x)&&x.type==='js-error').length]});
+}
+function decRow(d){const sc=decScore(d),a=d.app||{},ai=d.ai||{},did=d.did||{},s=d.sit||{};
+  const say=c=>!c||!c.action?'':c.action==='done'?'Stop':c.action==='extra'?'Extra set':c.action==='continue'?'Next set':c.action;
+  return [d.id,d.date,hhmm(d.at),d.ex,d.setNo,s.w,s.r,s.tr||'',s.rir!=null?s.rir:'',s.feel||'',s.strain!=null?s.strain:'',s.rest!=null?s.rest:'',s.setSec!=null?s.setSec:'',s.min!=null?s.min:'',s.ready||'',s.block||'',
+    say(a),a.w!=null?a.w:'',a.r!=null?a.r:'',a.why||'',say(ai),ai.w!=null?ai.w:'',ai.r!=null?ai.r:'',ai.rest!=null?ai.rest:'',ai.say||'',
+    did.action==='stopped'?'Stopped':did.action==='drop'?'Drop set':did.action==='extra'?'Extra set':did.action?'Next set':'',did.w!=null?did.w:'',did.r!=null?did.r:'',sc.agree==null?'':sc.agree?'yes':'no',sc.appErr!=null?sc.appErr:'',sc.aiErr!=null?sc.aiErr:'',sc.followedApp==null?'':sc.followedApp?'yes':'no',sc.followedAi==null?'':sc.followedAi?'yes':'no']}
+const SYNC_V=3; /* bump when sheet columns change: everything is re-sent once */
 function pendingRows(all){
-  const y=SY(); all=all||y.v!==SYNC_V; const out={Workouts:[],Sets:[],Targets:[],Coach:[],Body:[]}, mark={s:{},b:{},c:y.c};
+  const y=SY(); all=all||y.v!==SYNC_V; y.d=y.d||{}; y.e=y.e||0; const out={Workouts:[],Sets:[],Targets:[],Coach:[],Body:[],Decisions:[],Events:[],Model:[],Scorecard:[]}, mark={s:{},b:{},c:y.c,d:{},e:y.e,m:null,sc:null};
   S.sessions.filter(s=>!s.demo).forEach(s=>{const h=hsh(s);if(!all&&y.s[s.id]===h)return;const r=sessionRows(s);Object.keys(r).forEach(k=>out[k].push(...r[k]));mark.s[s.id]=h});
   (S.coachLog||[]).forEach(x=>{if(!all&&x.at<=y.c)return;const d=new Date(x.at);
     out.Coach.push([`${x.at}-${x.kind}`,x.date||todayISO(),hhmm(x.at),COACH_KIND[x.kind]||x.kind,x.kind==='chat'?x.ask||'':shortAsk(x.ask),x.error?'':answerTxt(x.kind,x.answer),x.used||'',x.error?`${x.error.msg||''}${x.error.detail?' | '+x.error.detail:''}`:'',x.provider||'',x.model||'',x.kind==='chat'?'':x.ask||'',x.answer&&typeof x.answer==='object'?x.answer:'']);mark.c=Math.max(mark.c,x.at)});
   (S.profile.weights||[]).filter(w=>!w.demo).forEach(w=>{if(!all&&y.b[w.date]===w.kg)return;out.Body.push([w.date,w.date,w.kg]);mark.b[w.date]=w.kg});
+  DEC().filter(d=>d.did).forEach(d=>{const r=decRow(d),h=hsh(r);if(!all&&y.d[d.id]===h)return;out.Decisions.push(r);mark.d[d.id]=h});
+  (S.events||[]).forEach(x=>{if(!all&&x.at<=y.e)return;out.Events.push([`${x.at}-${x.type}`,x.date,hhmm(x.at),x.type,x.detail,x.build]);mark.e=Math.max(mark.e,x.at)});
+  const n0=Object.values(out).reduce((a,r)=>a+r.length,0);
+  /* learned numbers and the scorecard are recomputed; send only when something else changed or they did */
+  const M=modelRows(), SC=scoreRows(), mh=hsh(M.map(r=>r.slice(0,-1))), sh=hsh(SC);
+  if(all||n0||y.m!==mh){out.Model=M;mark.m=mh} if(all||n0||y.sc!==sh){out.Scorecard=SC;mark.sc=sh}
   const n=Object.values(out).reduce((a,r)=>a+r.length,0);
-  return {out,mark,n};
+  return {out,mark,n:n0||((y.m!==mh||y.sc!==sh)?out.Model.length+out.Scorecard.length:0)};
 }
 let syncTimer=null;
 function syncSoon(ms=4000){if(!sheetUrl())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncSheets(false),ms)}
@@ -2426,7 +2510,7 @@ async function syncSheets(all,manual){
     const tabs=Object.keys(out).filter(k=>out[k].length).map(k=>({name:k,header:SHEET_TABS[k],rows:out[k].map(r=>r.map(cell))}));
     const res=await fetchT(url,30000,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({app:'Flowfit',build:myBuild(),sentAt:new Date().toISOString(),tabs})});
     const j=await res.json(); if(!j||!j.ok)throw new Error(j&&j.error||'The sheet didn’t accept the data');
-    const y=SY(); Object.assign(y.s,mark.s); Object.assign(y.b,mark.b); y.c=Math.max(y.c,mark.c); y.last=Date.now(); y.v=SYNC_V; ui.syncErr=null; save();
+    const y=SY(); Object.assign(y.s,mark.s); Object.assign(y.b,mark.b); y.d=y.d||{}; Object.assign(y.d,mark.d); y.c=Math.max(y.c,mark.c); y.e=Math.max(y.e||0,mark.e); if(mark.m)y.m=mark.m; if(mark.sc)y.sc=mark.sc; y.last=Date.now(); y.v=SYNC_V; ui.syncErr=null; save();
     if(manual)toast(`Sent ${n} row${n>1?'s':''} to Google Sheets`);
   }catch(e){ui.syncErr=String(e&&e.message||e).slice(0,160);if(manual)toast('Couldn’t reach your sheet. Check the link');}
   finally{ui.syncing=false;render()}
@@ -2559,28 +2643,28 @@ const act={
   stepW(d){const e=S.active.exercises[d.i],c=curIdx(e),s=e.sets[c];const v=stepFrom(e.name,r1(toDisp(s.w)),+d.d>0?1:-1);setW(e,c,fromDisp(v));bump('sw-'+e.id)},
   stepR(d){const e=S.active.exercises[d.i],c=curIdx(e),s=e.sets[c];if(s.pr==null&&!s.done)s.pr=s.r;s.r=clamp(s.r+(+d.d),1,100);if(!s.done)s.edited=true;propR(e,c);render();bump('sr-'+e.id)},
   pickSet(d){const e=S.active.exercises[d.i];ui.curSet[e.id]=+d.j;render()},
-  tick(d){const a=S.active,e=a.exercises[d.i],s=e&&e.sets[d.j];if(!s)return;s.done=!s.done;
-    if(s.done){if(!a.started){a.ready=a.ready||'normal';a.started=Date.now();ui.sel=todayISO();ui.finish=null;wakeOn()}a.lastAt=Date.now();s.doneAt=Date.now();if(!s.drop){s.r0=s.r0||e.tg&&e.tg.r;recordSignals(e,+d.j);adjustNext(e,+d.j);ui.feel={eid:e.id,j:+d.j};queueAiSet(e,+d.j)}
+  tick(d){const a=S.active,e=a.exercises[d.i],s=e&&e.sets[d.j];if(!s)return;s.done=!s.done;if(!s.done)ev('untick',`${e.name} set ${+d.j+1}`);
+    if(s.done){if(!a.started){a.ready=a.ready||'normal';a.started=Date.now();ui.sel=todayISO();ui.finish=null;wakeOn()}a.lastAt=Date.now();s.doneAt=Date.now();decFill(e,+d.j);if(!s.drop){s.r0=s.r0||e.tg&&e.tg.r;recordSignals(e,+d.j);adjustNext(e,+d.j);decLog(e,+d.j);ui.feel={eid:e.id,j:+d.j};queueAiSet(e,+d.j)}
       const all=e.sets.every(x=>x.done), every=a.exercises.filter(x=>!x.skipped).every(x=>x.sets.every(y=>y.done));
       buzz(every?[30,60,30,60,60]:all?[20,50,40]:20);
       const nx=e.sets.findIndex(x=>!x.done);if(nx>=0)ui.curSet[e.id]=nx;else{delete ui.curSet[e.id];ui.openEx=null;a.lastDone=e.id;setTimeout(()=>{const f=focusId();if(f&&f!==e.id){const el=document.getElementById('ex-'+f);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})}},450)}
       if(every){ui.restEnd=0;ui.finish='confirm';setTimeout(()=>toast('All sets done. Save when ready'),150)}
-      else{ui.restTotal=(e.rest||S.settings.rest)*1000;ui.restEnd=Date.now()+ui.restTotal;if(S.active.win)S.active.win.plan=ui.restTotal;if(all)setTimeout(()=>toast(`${e.name} done`),150)}}
+      else{ui.restTotal=(e.rest||S.settings.rest)*1000;ui.restEnd=Date.now()+ui.restTotal;a.restOver=ui.restEnd;if(S.active.win)S.active.win.plan=ui.restTotal;if(all)setTimeout(()=>toast(`${e.name} done`),150)}}
     else{buzz(8);ui.restEnd=0;delete s.feel;delete s.strain;if(e.sug&&e.sug.from>=+d.j)delete e.sug;if(ui.feel&&ui.feel.eid===e.id)ui.feel=null}
     render()},
-  addDrop(d){const e=S.active.exercises[+d.i];if(!e)return;const l=e.sets.at(-1);if(!l)return;
+  addDrop(d){const e=S.active.exercises[+d.i];if(!e)return;ev('drop-set',e.name);const l=e.sets.at(-1);if(!l)return;
     const cur=r1(toDisp(l.w)),st=stepFor(e.name),k=Math.max(1,Math.round(cur*0.25/st)),w=customStep(e.name)?r1(cur-k*st):stepFrom(e.name,cur,-k);
     if(!(w>0)){toast('Already at the lightest weight');return}
     e.sets.push({w:fromDisp(w),r:Math.max(4,Math.round(l.r*0.75)),rir:0,drop:true,done:false});ui.curSet[e.id]=e.sets.length-1;ui.openEx=e.id;buzz(15);render();
     setTimeout(()=>{const el=document.getElementById('ex-'+e.id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},60)},
-  later(d){const a=S.active,i=+d.i,j=nextOpenAfter(i);if(!j)return;const [e]=a.exercises.splice(i,1);e.later=true;
+  later(d){const a=S.active,i=+d.i,j=nextOpenAfter(i);if(!j)return;ev('later',a.exercises[i].name);const [e]=a.exercises.splice(i,1);e.later=true;
     a.exercises.splice(j,0,e);ui.openEx=null;
     if(e.tg&&e.tg.kind!=='new'&&COMPOUND_RX.test(e.name)){const r=Math.max(1,e.tg.r-1);e.tg={...e.tg,r,why:e.tg.why+'. Doing it later today, so one rep fewer is fine'};e.sets.forEach(x=>{if(!x.done&&!x.drop){x.r=r;x.r0=r}})}buzz(15);toast(`${e.name} moved after ${a.exercises[j-1].name}`);render()},
   addSet(d){const e=S.active.exercises[d.i],l=e.sets[e.sets.length-1];e.sets.push({w:l.w,r:l.r,done:false});ui.curSet[e.id]=e.sets.length-1;render()},
   rmSet(d){const e=S.active.exercises[d.i];if(e.sets.length>1)e.sets.pop();delete ui.curSet[e.id];render()},
-  skip(d){const e=S.active.exercises[d.i];e.skipped=!e.skipped;render()},
+  skip(d){const e=S.active.exercises[d.i];e.skipped=!e.skipped;ev(e.skipped?'skip':'unskip',e.name);render()},
   restAdd(){if(ui.restEnd<=Date.now())return;ui.restEnd+=15000;ui.restTotal+=15000;renderDock()},
-  restSkip(){ui.restEnd=0;renderDock()},
+  restSkip(){ui.restEnd=0;if(S.active)S.active.restOver=Date.now();ev('rest-skip','');renderDock()},
   askDel(d){ui.confirm='del:'+d.id;render()},
   cancelConfirm(){ui.confirm=null;render()},
   delSession(d){const snap=JSON.stringify(S.sessions),fresh=()=>{if(S.active&&!S.active.started)S.active=null};S.sessions=S.sessions.filter(s=>s.id!==d.id);ui.confirm=null;fresh();render();toast('Workout deleted',()=>{S.sessions=JSON.parse(snap);fresh();render()})},
@@ -2707,7 +2791,7 @@ const act={
     if(!(e.sug&&e.sug.src==='ai'))adjustNext(e,+d.j);
     if(ui.aiPend&&ui.aiPend.eid===e.id&&ui.aiPend.j===+d.j){clearTimeout(ui.aiPend.t);ui.aiPend=null;runNextSet(e,+d.j)}
     setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id&&ui.feel.j===+d.j){ui.feel=null;renderDock()}},700);render()},
-  useSug(d){const e=S.active.exercises[+d.i];if(!e||!e.sug)return;const g=e.sug;e.sets.forEach((x,k)=>{if(!x.done){x.w=g.w;if(g.reps){x.r=g.r;x.r0=g.r}if(g.src==='ai'){x.r=g.r;x.r0=g.r;if(k===e.sets.findIndex(y=>!y.done))x.rir=g.rir}}});delete e.sug;buzz(15);render();bump('sw-'+e.id)},
+  useSug(d){const e=S.active.exercises[+d.i];if(!e||!e.sug)return;const g=e.sug;ev('used-suggestion',`${e.name}: ${fmtW(g.w)} × ${g.r||''} (${g.src||'app'})`);e.sets.forEach((x,k)=>{if(!x.done){x.w=g.w;if(g.reps){x.r=g.r;x.r0=g.r}if(g.src==='ai'){x.r=g.r;x.r0=g.r;if(k===e.sets.findIndex(y=>!y.done))x.rir=g.rir}}});delete e.sug;buzz(15);render();bump('sw-'+e.id)},
   whyTarget(d){const e=S.active&&S.active.exercises[+d.i];if(e&&e.tg&&e.tg.kind!=='new')runWhy(e)},
   ptab(d){if(ui.ptab===d.v)return;ui.ptab=d.v;lastView=null;render();window.scrollTo(0,0)},
   prange(d){ui.range=d.v;render()},
@@ -2785,6 +2869,7 @@ function maybeBonus(e,j){
   if(ph==='deload'||a.ready==='tired'||(e.bonus||0)>=2) return false;
   const last=e.sets[j], cur=r1(toDisp(last.w)), up=last.w>0?stepFrom(e.name,cur,1):0, ok=up>0&&repsAt(cur,last.r,up)>=Math.max(5,last.r-3), w=ok?fromDisp(up):last.w, rr=ok?last.r:last.r+2;
   e.sets.push({w,r:rr,rir:failureOK(e.name)?0:1,bonus:true,done:false,r0:rr});
+  decApp(e,j,{action:'extra',w:r1(toDisp(w)),r:rr,why:'Felt easy: one more set'});
   e.bonus=(e.bonus||0)+1; delete e.sug; ui.openEx=e.id; ui.feel=null;
   if(ui.finish==='confirm'){ui.finish=null;ui.dockOpen=false}
   if(ui.aiPend){clearTimeout(ui.aiPend.t);ui.aiPend=null}
@@ -2803,6 +2888,10 @@ function recordSignals(e,j){
   s.sig={restPlannedSec:first||!w.plan?null:Math.round(w.plan/1000),restTakenSec:first?null:restTaken,offAppSec:Math.round(w.off/1000),inAppTaps:w.taps,
     restOverrunSec:first||!w.plan?null:Math.round(restTaken-w.plan/1000),userWeightChange:s.pw!=null?r1(toDisp(s.w)-toDisp(s.pw)):0,userRepChange:s.pr!=null?s.r-s.pr:0,
     estSetSec:setSec,minutesIntoWorkout:Math.round((now-(a.started||now))/60000),hour:new Date().getHours()};
+  /* real set time: from when rest ended (or was skipped) to the tick */
+  const ro=a.restOver, dur=ro&&now>ro?Math.round((now-ro)/1000):null;
+  if(!first&&dur!=null&&dur<=300){s.sig.setSec=dur;s.sig.secPerRep=s.r>0?Math.round(dur/s.r*10)/10:null}
+  s.sig.doneAt=hhmm(now); a.restOver=null;
   a.win={from:now,off:0,taps:0,hiddenAt:document.visibilityState==='hidden'?now:null,plan:null};
   computeStrain(e,j);
 }
@@ -2933,7 +3022,7 @@ $('#fileIn').addEventListener('change',e=>{const f=e.target.files&&e.target.file
   r.readAsText(f)});
 $('#bkIn').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const t=$('#rsText');if(t){t.value=String(r.result||'');toast(`Loaded ${f.name}. Tap Replace to restore.`)}};r.readAsText(f)});
 window.addEventListener('online',()=>{rerender();setTimeout(flushPending,1500);syncSoon(3000)});
-setTimeout(()=>syncSoon(1000),6000);
+setTimeout(()=>{try{if(myBuild()&&S.lastBuild!==myBuild()){ev('app-updated',`build ${S.lastBuild||'?'} → ${myBuild()}`);S.lastBuild=myBuild();save()}}catch(e){}syncSoon(1000)},6000);
 /* look for a new build once a day, quietly */
 setTimeout(()=>{const u=updInfo();if(isNative()&&myBuild()&&online()&&(!u||Date.now()-u.checked>20*36e5))checkUpdate(false)},4000);window.addEventListener('offline',rerender);
 window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(VIEWS.includes(v)&&v!==ui.view){ui.view=v;render()}});
