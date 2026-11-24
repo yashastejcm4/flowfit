@@ -189,6 +189,8 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .steppers{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stp-l{font-size:12px;color:var(--muted);margin:0 0 6px 4px}
 .set .n{white-space:nowrap}
+.mach-line{display:flex;align-items:center;gap:10px;margin-top:-2px}
+.seg.sm button{height:30px;padding:0 11px;font-size:12.5px}
 .ex-acts{display:flex;gap:14px;align-items:center;flex:none}
 .stp-inc{font-size:12px;font-weight:600;padding:0;min-height:0;color:var(--accent-fg);text-decoration:underline dotted;text-underline-offset:3px}
 .stp{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;background:var(--surface-2);border-radius:999px;padding:4px}
@@ -279,6 +281,18 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .seg button{font-size:13px;font-weight:600;padding:9px 14px;border-radius:999px;color:var(--muted);text-transform:capitalize}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .set-line{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;min-height:50px}
+.set-card{gap:0}
+.set-card .sl-t{flex:1 1 120px}
+.set-card .set-line{padding:10px 0;border-top:1px solid var(--line)}
+.set-card .set-grp+.set-line{border-top:0}
+.set-grp{font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:16px 0 4px}
+.set-card .set-grp:first-child{padding-top:2px}
+.mode-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mode-opts button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:11px 12px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);text-align:left;min-height:84px}
+.mode-opts button b{font-size:14px;font-weight:600}
+.mode-opts button span{font-size:11.5px;line-height:1.35;color:var(--muted)}
+.mode-opts button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface-2))}
+.mode-opts button[aria-pressed="true"] b{color:var(--accent-fg)}
 .set-line>span{font-weight:500}
 .mini-step{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border-radius:999px;padding:4px}
 .mini-step button{width:36px;height:36px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center}
@@ -463,6 +477,10 @@ a.btn{text-decoration:none}
 /* phases, setup, feel bar */
 .ph{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mchips{display:flex;flex-wrap:wrap;gap:6px}
+.fb-why{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.fb-pain{display:flex;justify-content:flex-end;margin-top:8px}
+.fb-pain .chip{height:32px;padding:0 12px;font-size:12.5px}
+.fb-pain .chip[aria-pressed="true"]{background:color-mix(in srgb,var(--danger) 18%,transparent);border-color:var(--danger);color:var(--danger)}
 .mchips .chip{height:34px;padding:0 13px;font-size:13px}
 .chk{display:grid;gap:8px}
 .chk-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -721,17 +739,20 @@ const MACHINE_RX=/machine|cable|pulldown|pull-down|pushdown|push-down|pec deck|s
 const DB_RX=/dumbbell|\bdb\b|hammer|lateral raise|concentration|kickback/i;
 function incs(){if(!S.inc)S.inc={};return S.inc}
 const incKey=n=>String(n||'').toLowerCase().trim();
-const hasInc=name=>incs()[incKey(name)]!=null;
+/* which machine you're on for an exercise (A/B/C), when the gym has more than one */
+const curMach=name=>(S.mach&&S.mach[incKey(name)])||'';
+const stepKey=name=>incKey(name)+(curMach(name)?'#'+curMach(name):'');
+const hasInc=name=>incs()[stepKey(name)]!=null;
 const incDefaultKg=name=>MACHINE_RX.test(name||'')&&!DB_RX.test(name||'')?5:2.5;
 /* learn a machine's weight step from the weights you've logged on it (e.g. 25, 32, 39 → 7 kg) */
 let _lsKey='',_ls={};
 function learnedStep(name){
   const a=S.active, key=S.sessions.length+':'+(a?a.exercises.reduce((n,e)=>n+e.sets.filter(x=>x.done).length,0):0)+':'+U();
   if(key!==_lsKey){_lsKey=key;_ls={}}
-  const k=incKey(name); if(k in _ls) return _ls[k];
-  const ws=new Set(), add=sets=>sets.forEach(x=>{if(x.w>0)ws.add(Math.round(toDisp(x.w)*4)/4)});
-  S.sessions.forEach(s=>s.exercises.forEach(e=>{if(incKey(e.name)===k)add(e.sets)}));
-  if(a)a.exercises.forEach(e=>{if(incKey(e.name)===k)add(e.sets.filter(x=>x.done))});
+  const k=stepKey(name), base=incKey(name), m=curMach(name); if(k in _ls) return _ls[k];
+  const ws=new Set(), add=sets=>sets.forEach(x=>{if(x.w>0)ws.add(Math.round(toDisp(x.w)*4)/4)}), onM=e=>!m||(e.machine||'')===m;
+  S.sessions.forEach(s=>s.exercises.forEach(e=>{if(incKey(e.name)===base&&onM(e))add(e.sets)}));
+  if(a)a.exercises.forEach(e=>{if(incKey(e.name)===base&&onM(e))add(e.sets.filter(x=>x.done))});
   const v=[...ws].sort((x,y)=>x-y), diffs=v.slice(1).map((x,i)=>r1(x-v[i])).filter(d=>d>0);
   let out=null;
   if(diffs.length){const d=Math.min(...diffs);if(d>=0.5&&d<=20&&diffs.every(x=>Math.abs(x/d-Math.round(x/d))<0.15))out=d}
@@ -739,7 +760,7 @@ function learnedStep(name){
 }
 const customStep=name=>hasInc(name)||!!learnedStep(name);
 /* step for this exercise, in display units: what you set > what the app learned > a sensible default */
-function stepFor(name){const v=incs()[incKey(name)];if(v!=null)return r1(toDisp(v));const l=learnedStep(name);if(l)return l;return U()==='lb'?incDefaultKg(name)*2:incDefaultKg(name)}
+function stepFor(name){const v=incs()[stepKey(name)];if(v!=null)return r1(toDisp(v));const l=learnedStep(name);if(l)return l;return U()==='lb'?incDefaultKg(name)*2:incDefaultKg(name)}
 /* move a weight (display units) by k steps. A set jump (e.g. 7 kg) adds on top of the current weight; the default snaps to clean numbers */
 function stepFrom(name,cur,dir,k=1){const st=stepFor(name);if(customStep(name))return Math.max(0,r1(cur+dir*st*k));const v=cur/st,n=dir>0?Math.floor(v+1e-9)+k:Math.ceil(v-1e-9)-k;return Math.max(0,r1(n*st))}
 /* put any weight (display units) on this exercise's real weight steps */
@@ -747,9 +768,27 @@ function snapW(name,w,ref){const st=stepFor(name);if(!(st>0)||!isFinite(w)||!cus
 /* about pct lighter, on real steps (kg in, kg out). If one step is already more than that, keep the weight */
 function lighterKg(name,kg,pct){const st=stepFor(name),cur=r1(toDisp(kg));if(!customStep(name))return roundStepKg(kg*(1-pct),'down',name);const k=Math.round(cur*pct/st+1e-9);return fromDisp(Math.max(0,r1(cur-k*st)))}
 /* reps you'd likely get at a new weight, from a set you did (Epley) */
-const repsAt=(w,r,nw)=>nw>0?30*(e1rm(w,r)/nw-1):99;
+/* your own strength curve: how reps change with weight, learned from hard sets at two weights (starts at the textbook 30) */
+let _kKey=-1,_k=30;
+function strengthK(){const key=S.sessions.length;if(key===_kKey)return _k;_kKey=key;const v=[];
+  S.sessions.forEach(s=>s.exercises.forEach(e=>{const ms=e.sets.filter(x=>!x.d&&x.w>0&&x.r>0&&(x.f==='hard'||(x.t!=null&&x.t<=1)));
+    for(let i=0;i<ms.length;i++)for(let k=i+1;k<ms.length;k++){const a=ms[i],b=ms[k];if(Math.abs(a.w-b.w)<0.01)continue;const K=(b.w*b.r-a.w*a.r)/(a.w-b.w);if(K>10&&K<80)v.push(K)}}));
+  if(!v.length)return _k=30; v.sort((x,y)=>x-y); const med=v[Math.floor(v.length/2)]; return _k=Math.round((v.length*med+5*30)/(v.length+5)*10)/10}
+const repsAt=(w,r,nw)=>{const K=strengthK();return nw>0?K*(w*(1+r/K)/nw-1):99};
+/* reps you lose from one set to the next on this exercise (same weight), learned from your logs */
+function fatigueFor(name){const v=[];S.sessions.forEach(s=>s.exercises.forEach(e=>{if(e.name!==name)return;const ms=e.sets.filter(x=>!x.d);for(let i=1;i<ms.length;i++)if(Math.abs(ms[i].w-ms[i-1].w)<0.01)v.push(ms[i-1].r-ms[i].r)}));
+  return v.length>=3?{avg:Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10,n:v.length}:null}
+/* the shortest rest that keeps your reps (lose 1 or less), learned per exercise */
+function restFor(name){const b={};S.sessions.forEach(s=>s.exercises.forEach(e=>{if(e.name!==name)return;const ms=e.sets.filter(x=>!x.d);
+    for(let i=1;i<ms.length;i++){const g=ms[i].sig;if(!g||g.restTakenSec==null||Math.abs(ms[i].w-ms[i-1].w)>0.01)continue;const t=g.restTakenSec,k=t<=75?60:t<=105?90:t<=135?120:t<=165?150:180;(b[k]=b[k]||[]).push(ms[i-1].r-ms[i].r)}}));
+  const n=Object.values(b).reduce((a,x)=>a+x.length,0); if(n<6)return null;
+  for(const k of [60,90,120,150,180]){const x=b[k];if(x&&x.length>=3&&x.reduce((a,c)=>a+c,0)/x.length<=1)return k} return null}
+/* how many fewer reps you get when an exercise is done later than planned */
+function latePenalty(){const v=[];const ss=sorted();ss.forEach((s,i)=>s.exercises.filter(e=>e.late).forEach(e=>{const prev=[...ss.slice(0,i)].reverse().find(x=>x.exercises.some(y=>y.name===e.name&&!y.late));if(!prev)return;const pe=prev.exercises.find(y=>y.name===e.name);
+  const a=e.sets.filter(x=>!x.d),b=pe.sets.filter(x=>!x.d);if(!a.length||!b.length)return;const wa=Math.max(...a.map(x=>x.w)),wb=Math.max(...b.map(x=>x.w));if(Math.abs(wa-wb)>0.01)return;v.push(Math.max(...b.map(x=>x.r))-Math.max(...a.map(x=>x.r)))}));
+  return v.length>=2?clamp(Math.round(v.reduce((a,c)=>a+c,0)/v.length),0,4):1}
 /* reps to reach at this weight before the next step is a sensible jump: land no lower than ~2 under the range */
-function jumpNeed(name,wD,lo,hi){if(!(wD>0))return hi;const st=stepFor(name),land=Math.max(5,lo-2);return clamp(Math.ceil(30*((wD+st)/wD*(1+land/30)-1)-1e-9),hi,hi+5)}
+function jumpNeed(name,wD,lo,hi){if(!(wD>0))return hi;const st=stepFor(name),land=Math.max(5,lo-2),K=strengthK();return clamp(Math.ceil(K*((wD+st)/wD*(1+land/K)-1)-1e-9),hi,hi+5)}
 
 /* ---------- domain ---------- */
 const sorted=()=>[...S.sessions].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.end||0)-(b.end||0));
@@ -860,6 +899,7 @@ function calcFor(pe,tg){
     phase:ph.key==='block'?`${ph.label}, aim ${ph.rir} reps left`:ph.label, sessions:L.length,
     rule:tg.kind==='new'?'No history: find a working weight':tg.kind==='up'?'Hit the target reps: add one step':tg.kind==='down'?'Lighter: easy week or a dip':need&&need>hi?`Big jump: build reps to ${need} before +${stepFor(name)} ${u}`:'Same weight, add a rep'};
 }
+function lastTarget(name){const n=name.toLowerCase();for(const s of sorted().reverse()){const e=s.exercises.find(x=>x.name.toLowerCase()===n);if(e)return e.target||null}return null}
 function targetCore(pe){
   const name=pe.name, lo=pe.reps, hi=Math.max(pe.repsHi||pe.reps,lo), reps=lo===hi?`${lo}`:`${lo}–${hi}`, nw=S.nextW&&S.nextW[name.toLowerCase()], phx=phaseNow(), ph=phx.key;
   if(nw!=null) return {w:nw,r:lo,lo,hi,kind:'coach',why:'Coach suggestion you applied'};
@@ -868,6 +908,7 @@ function targetCore(pe){
   const last=L.at(-1), st=liftStatus(name), stp=stepFor(name), u=U();
   if(ph==='deload'){const w=lighterKg(name,last.w,0.1);return w<last.w-1e-9?{w,r:lo,lo,hi,kind:'down',why:'Easy week: about 10% lighter so you recover and grow'}:{w:last.w,r:lo,lo,hi,kind:'hold',why:`Easy week: one step on this machine (${stp} ${u}) is too big a drop, so same weight and stop at ${lo} reps`}}
   if(st.key==='dropping'){const w=lighterKg(name,last.w,0.1);return w<last.w-1e-9?{w,r:lo,lo,hi,kind:'down',why:'About 10% lighter: your last sessions dipped, so rebuild from here'}:{w:last.w,r:lo,lo,hi,kind:'hold',why:`Your last sessions dipped. Same weight, aim for ${lo} clean reps`}}
+  if(st.key==='stalled'&&L.length>=4&&!/^Stuck/.test((lastTarget(name)||{}).why||'')){const w=lighterKg(name,last.w,0.05);if(w<last.w-1e-9)return {w,r:hi,lo,hi,kind:'down',why:`Stuck for 3 sessions: about 5% lighter, go for ${hi} reps to restart progress`}}
   if(last.w===0){const r=Math.max(lo,Math.min(...last.sets.map(x=>x.r))+1);return {w:0,r,lo,hi,kind:'hold',why:`No added weight: aim for ${r} reps, one more than last time`}}
   const hard=last.sets.some(x=>x.f==='hard'), early=ph==='block'&&phx.wk===1, late=ph==='block'&&phx.rir<=1;
   const atTop=last.sets.filter(x=>x.w>=last.w-1e-9), minR=Math.min(...atTop.map(x=>x.r)), curD=r1(toDisp(last.w)), need=jumpNeed(name,curD,lo,hi), pct=Math.round(stp/curD*100);
@@ -887,7 +928,8 @@ function buildDraft(dayId){
   const exs=d.exercises.map((e,i)=>({e,i})).sort((a,b)=>(pr.includes(b.e.muscle)?1:0)-(pr.includes(a.e.muscle)?1:0)||a.i-b.i).map(x=>x.e);
   return {date:todayISO(),dayId,dayName:d.name,started:null,lastAt:null,ready:null,phase:ph,rirBase:phx.rir,pump:{},
     exercises:exs.map(e=>{const tg=targetFor(e), n=setsFor(e);
-      return {id:uid(),name:e.name,muscle:e.muscle,rest:e.rest||S.settings.rest,tg,skipped:false,
+      const lr=restFor(e.name);
+      return {id:uid(),name:e.name,muscle:e.muscle,machine:curMach(e.name),rest:lr||e.rest||S.settings.rest,restLearned:!!lr,tg,skipped:false,
         sets:Array.from({length:n},(_,j)=>({w:tg.w,r:tg.r,rir:appRir(ph,j,n,e.name,phx.rir),done:false}))}})};
 }
 /* ---- food for growth ---- */
@@ -912,17 +954,27 @@ function weekLine(ms){const t=ms.filter(m=>volTarget(m)!=null).map(m=>`${m} ${do
 function chk(){if(!ui.chk)ui.chk={sleep:'ok',energy:'ok',joint:'no',sore:{}};return ui.chk}
 const todayMuscles=a=>[...new Set(a.exercises.filter(e=>!e.skipped).map(e=>e.muscle))];
 const soreList=a=>todayMuscles(a).filter(m=>{const d=daysSince(m);return d!=null&&d<=6}).slice(0,3);
-const chkReady=c=>c.sleep==='bad'||c.energy==='low'?'tired':c.sleep==='good'&&c.energy==='high'?'fresh':'normal';
-function chkSummary(c,a){const r=chkReady(c), sore=Object.keys(c.sore).filter(m=>c.sore[m]==='sore'&&soreList(a).includes(m));
-  return ({tired:'Taking it easier: 5% lighter, fewer accessory sets.',fresh:'Feeling great: going for the top of your rep ranges.',normal:'Training as planned.'})[r]+(sore.length?` One less set for ${sore.join(', ')}.`:'')+(c.joint==='yes'?' No sets to failure today.':'')}
+/* readiness 0-100 from sleep, energy, soreness, joints and your last workout */
+function readiness(c,a){let s=70;const why=[];
+  if(c.sleep==='bad'){s-=20;why.push('poor sleep')}else if(c.sleep==='good')s+=10;
+  if(c.energy==='low'){s-=20;why.push('low energy')}else if(c.energy==='high')s+=10;
+  if(a)soreList(a).forEach(m=>{const v=c.sore[m];if(v==='sore'){s-=10;why.push(m+' very sore')}else if(v==='abit')s-=4});
+  if(c.joint==='yes'){s-=10;why.push('joint pain')}
+  const last=sorted().at(-1); if(last){if(diffDays(last.date,todayISO())===0){s-=5;why.push('already trained today')}
+    const st=last.exercises.flatMap(e=>e.sets).map(x=>x.st).filter(v=>v!=null); if(st.length&&st.reduce((x,y)=>x+y,0)/st.length>75){s-=8;why.push('last workout was very hard')}}
+  return {score:clamp(s,0,100),why}}
+const chkReady=(c,a)=>{const r=readiness(c,a||S.active).score;return r<55?'tired':r>=85?'fresh':'normal'};
+function chkSummary(c,a){const r=chkReady(c,a), rd=readiness(c,a), sore=Object.keys(c.sore).filter(m=>c.sore[m]==='sore'&&soreList(a).includes(m));
+  return `Readiness ${rd.score}/100${rd.why.length?` (${rd.why.join(', ')})`:''}. `+({tired:'Taking it easier: 5% lighter, fewer accessory sets.',fresh:'Feeling great: going for the top of your rep ranges.',normal:'Training as planned.'})[r]+(sore.length?` One less set for ${sore.join(', ')}.`:'')+(c.joint==='yes'?' No sets to failure today.':'')}
 function applyChecks(c){
   const a=S.active, ms=todayMuscles(a), sl=soreList(a), base={date:todayISO(),sleep:c.sleep,energy:c.energy,joint:c.joint==='yes'};
   const r=recov(); (ms.length?ms:[null]).forEach(m=>r.push({...base,m,sore:m&&sl.includes(m)?c.sore[m]||'fresh':'fresh'})); if(r.length>80)r.splice(0,r.length-80);
-  a.check={sleep:c.sleep,energy:c.energy,joint:c.joint==='yes',sore:{...c.sore}};
+  a.check={sleep:c.sleep,energy:c.energy,joint:c.joint==='yes',sore:{...c.sore}}; a.readyScore=readiness(c,a).score;
   a.exercises.forEach(e=>{if(e.skipped||e.sets.some(x=>x.done))return;
     if(c.sore[e.muscle]==='sore'&&sl.includes(e.muscle)&&e.sets.length>1){e.sets.pop();const n=e.sets.length;e.sets.forEach((x,j)=>x.rir=appRir(a.phase,j,n,e.name,a.rirBase))}
+    else if(c.sore[e.muscle]==='abit'&&daysSince(e.muscle)!=null&&daysSince(e.muscle)<=1&&e.sets.length>2){e.sets.pop();const n=e.sets.length;e.sets.forEach((x,j)=>x.rir=appRir(a.phase,j,n,e.name,a.rirBase))}
     if(c.joint==='yes')e.sets.forEach(x=>{if(x.rir===0)x.rir=1})});
-  ui.chk=null; return chkReady(c);
+  ui.chk=null; return chkReady(c,a);
 }
 function pumpBar(a){
   if(!a.started||ui.finish)return ''; if(!a.pump)a.pump={};
@@ -973,6 +1025,7 @@ function doSwap(inPlan){
 function adjustNext(e,j){
   const s=e.sets[j], tg=e.tg, nx=e.sets.findIndex((x,k)=>k>j&&!x.done);
   if(!tg||nx<0||!s||!s.done||tg.kind==='new'&&s.w===0){delete e.sug;return}
+  if(s.pain){const lw=stepFrom(e.name,r1(toDisp(s.w)),-1);e.sug={w:fromDisp(lw),r:s.r0||tg.r,dir:'down',from:j,why:lw>0?'Pain on that set: one step lighter. Stop this exercise if it still hurts':'Pain on that set: stop this exercise if it still hurts',src:'app'};return}
   const rd=S.active&&S.active.ready||'normal', ph=S.active&&S.active.phase||'block', late=S.active&&S.active.rirBase!=null&&S.active.rirBase<=1, st=stepFor(e.name), cur=r1(toDisp(s.w)), goal=s.r0||tg.r;
   const want=s.rir==null?2:s.rir, felt=s.feel?FEEL_RIR[s.feel]-want:null, k=s.strain;
   let dir=null, why='';
@@ -983,6 +1036,9 @@ function adjustNext(e,j){
   else if(rd!=='tired'&&ph!=='deload'&&s.feel!=='hard'&&(s.r-goal>=(rd==='fresh'||late?1:2)||(felt!=null&&felt>=1.5&&s.r>=goal))){dir='up';why=s.r-goal>=1?`You beat the target by ${s.r-goal} rep${s.r-goal>1?'s':''}`:`That felt easy for a “${rirText(want)}” set`}
   }
   if(!dir){delete e.sug;return}
+  const rs=s.read||{};
+  if(dir==='up'&&rs.longRest){delete e.sug;return} /* extra reps after a very long rest don't mean you're stronger */
+  if(dir==='down'&&rs.shortRest&&cur>0){e.sug={w:s.w,r:goal,dir:'same',from:j,why:'Reps dropped after a short rest: take the full rest, same weight',src:'app',reps:true};return}
   if(dir==='down'&&cur===0){delete e.sug;return}
   let nw=dir==='up'?stepFrom(e.name,cur,1):customStep(e.name)?stepFrom(e.name,cur,-1):Math.floor(cur*0.95/st+1e-9)*st; if(dir==='down'&&nw>=cur)nw=stepFrom(e.name,cur,-1);
   /* a big machine step mid-workout: only go up if you'd still get a sensible number of reps */
@@ -994,13 +1050,13 @@ function adjustNext(e,j){
 }
 function commit(a){
   const tgt=t=>t&&{w:t.w,r:t.r,kind:t.kind,why:t.why,calc:t.calc};
-  const exs=a.exercises.filter(e=>!e.skipped).map(e=>{const o={name:e.name,muscle:e.muscle,sets:e.sets.filter(s=>s.done).map(s=>{const o={w:s.w,r:s.r};if(s.feel)o.f=s.feel;if(s.rir!=null)o.t=s.rir;if(s.r0)o.tr=s.r0;if(s.strain!=null)o.st=s.strain;if(s.bonus)o.x=1;if(s.drop)o.d=1;if(s.say)o.c=s.say;if(s.sig)o.sig=s.sig;return o})};
-    if(e.tg)o.target=tgt(e.tg); if(e.tgApp)o.appTarget=tgt(e.tgApp); o.step=stepFor(e.name); if(e.late)o.late=1; return o}).filter(e=>e.sets.length);
+  const exs=a.exercises.filter(e=>!e.skipped).map(e=>{const o={name:e.name,muscle:e.muscle,sets:e.sets.filter(s=>s.done).map(s=>{const o={w:s.w,r:s.r};if(s.feel)o.f=s.feel;if(s.rir!=null)o.t=s.rir;if(s.r0)o.tr=s.r0;if(s.strain!=null)o.st=s.strain;if(s.bonus)o.x=1;if(s.drop)o.d=1;if(s.say)o.c=s.say;if(s.read&&s.read.text!=='Normal set')o.rd=s.read.text;if(s.why)o.y=s.why;if(s.pain)o.p=1;if(s.sig)o.sig=s.sig;return o})};
+    if(e.tg)o.target=tgt(e.tg); if(e.tgApp)o.appTarget=tgt(e.tgApp); o.step=stepFor(e.name); if(e.late)o.late=1; if(e.machine)o.machine=e.machine; return o}).filter(e=>e.sets.length);
   if(!exs.length) return null;
   const now=Date.now(), last=a.lastAt||a.started||now;
   /* if Save was tapped long after the last set, end the workout a few minutes after that set */
   const s={id:uid(),date:a.date,dayId:a.dayId,dayName:a.dayName,start:a.started||now,end:a.date===todayISO()?Math.min(now,last+8*60000):last,exercises:exs};if(a.pump&&Object.keys(a.pump).length)s.pump={...a.pump};if(a.check)s.check=a.check;
-  if(a.ready)s.ready=a.ready; if(a.phase)s.phase=a.phase; if(a.say)s.coachSaid=a.say;
+  if(a.ready)s.ready=a.ready; if(a.readyScore!=null)s.readyScore=a.readyScore; s.coachMode=coachMode(); if(a.phase)s.phase=a.phase; if(a.say)s.coachSaid=a.say;
   const sk=a.exercises.filter(e=>e.skipped).map(e=>e.name); if(sk.length)s.skipped=sk;
   decClose(a,s);
   S.sessions.push(s); ev('workout-saved',`${s.dayName}: ${sessSets(s)} sets, ${Math.round((s.end-s.start)/60000)} min`); if(S.nextW) exs.forEach(e=>delete S.nextW[e.name.toLowerCase()]); return s;
@@ -1249,6 +1305,7 @@ function exCard(e,i){
   return `<section class="card ex ${all?'allDone':''}" id="ex-${e.id}">
    <div class="ex-head">${mediaThumb(e.name)}<button class="nm exc-main tap" data-a="openEx" data-id="${e.id}" aria-expanded="true"><h3>${esc(e.name)}</h3><span class="mu">${mdot(e.muscle)}${esc(e.muscle)}${lp?` · last ${fmtW(lp.w)} × ${lp.sets.map(x=>x.r).join(',')}`:''}</span></button><div class="ex-acts">${e.sets.some(x=>x.done)||!nextOpenAfter(i)?'':`<button class="link plain tap" data-a="later" data-i="${i}" aria-label="Machine busy: do ${esc(e.name)} later">Later</button>`}<button class="link plain tap" data-a="skip" data-i="${i}">Skip</button></div></div>
    ${targetLine(e,i)}
+   ${machineLine(e,i)}
    <div class="steppers">
     <div><div class="stp-l">Weight (${U()}) · set ${c+1} · <button class="link plain tap stp-inc" data-a="openInc" data-n="${esc(e.name)}" aria-label="Weight jump for ${esc(e.name)}: ${stepFor(e.name)} ${U()}${!hasInc(e.name)&&learnedStep(e.name)?', learned from your logs':''}. Change">±${stepFor(e.name)}${!hasInc(e.name)&&learnedStep(e.name)?' · learned':''}</button></div><div class="stp" id="sw-${e.id}"><button class="tap" data-a="stepW" data-i="${i}" data-d="-1" aria-label="Less weight">${I('minus',18)}</button><input id="w-${e.id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-num="dec" data-c="setW" data-i="${i}" value="${toDisp(s.w).toFixed(1)}" aria-label="Weight for set ${c+1}"><button class="tap" data-a="stepW" data-i="${i}" data-d="1" aria-label="More weight">${I('plus',18)}</button></div></div>
     <div><div class="stp-l">Reps</div><div class="stp" id="sr-${e.id}"><button class="tap" data-a="stepR" data-i="${i}" data-d="-1" aria-label="Fewer reps">${I('minus',18)}</button><input id="r-${e.id}" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="setR" data-i="${i}" value="${s.r}" aria-label="Reps for set ${c+1}"><button class="tap" data-a="stepR" data-i="${i}" data-d="1" aria-label="More reps">${I('plus',18)}</button></div></div>
@@ -1318,8 +1375,11 @@ function feelBar(a){
   const f=ui.feel; if(!f||ui.finish==='ready'||ui.finish==='discard') return '';
   const e=a.exercises.find(x=>x.id===f.eid), s=e&&e.sets[f.j]; if(!s||!s.done) return '';
   return `<div class="feelbar"><div class="sm fb-l"><b>How did set ${f.j+1} feel?</b> <span class="muted">${esc(e.name)} · ${fmtW(s.w)} ${U()} × ${s.r}${s.strain!=null?` · looked ${strainWord(s.strain).toLowerCase()}`:''}</span></div>
-    <div class="feel3">${[['easy','Easy'],['good','Good'],['hard','Hard']].map(([v,l])=>`<button class="tap ${s.feel===v?'on':''}" data-a="feel" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}" data-v="${v}">${l}</button>`).join('')}</div></div>`;
+    <div class="feel3">${[['easy','Easy'],['good','Good'],['hard','Hard']].map(([v,l])=>`<button class="tap ${s.feel===v?'on':''}" data-a="feel" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}" data-v="${v}">${l}</button>`).join('')}</div>
+    ${changedSet(s)?`<div class="fb-why"><span class="sm muted">You changed the suggestion. Why?</span><div class="mchips">${WHY.map(([v,l])=>`<button class="chip tap" aria-pressed="${s.why===v}" data-a="setWhy" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}" data-v="${v}">${l}</button>`).join('')}</div></div>`:''}
+    <div class="fb-pain"><button class="chip tap" aria-pressed="${!!s.pain}" data-a="setPain" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}">${s.pain?'Pain noted':'Felt pain?'}</button></div></div>`;
 }
+const changedSet=s=>!!(s&&s.sig&&((s.sig.userWeightChange||0)!==0||(s.sig.userRepChange||0)!==0));
 function trendCounts(a){const c={up:0,hold:0,down:0,new:0,coach:0,ai:0};a.exercises.filter(e=>!e.skipped&&e.tg).forEach(e=>c[e.tg.kind]++);return c}
 function trendChips(a){const c=trendCounts(a);const p=[];if(c.up)p.push(`<span class="tk up">↑ ${c.up} going up</span>`);if(c.ai)p.push(`<span class="tk up">★ ${c.ai} planned by Coach</span>`);if(c.coach)p.push(`<span class="tk up">★ ${c.coach} from Coach</span>`);if(c.hold)p.push(`<span class="tk">= ${c.hold} holding</span>`);if(c.down)p.push(`<span class="tk down">↓ ${c.down} lighter</span>`);if(c.new)p.push(`<span class="tk">• ${c.new} new</span>`);return p.length?`<div class="row wrap" style="gap:6px">${p.join('')}</div>`:''}
 const READY={fresh:['Fresh','Go for the top of your rep ranges'],normal:['Normal','Train as planned'],tired:['Tired','5% lighter, one less set on accessories']};
@@ -1386,8 +1446,8 @@ function viewPlan(){
 /* ---------- progress engine (all numbers computed here) ---------- */
 const PUSH=['Chest','Shoulders','Triceps'], PULL=['Back','Biceps'];
 function liftSessions(name){
-  const n=(name||'').toLowerCase(), out=[];
-  for(const s of sorted()){const e=s.exercises.find(x=>x.name.toLowerCase()===n);if(!e)continue;const ms=mainSets(e.sets);if(!ms.length)continue;
+  const n=(name||'').toLowerCase(), m=curMach(name), any=m&&S.sessions.some(s=>s.exercises.some(x=>x.name.toLowerCase()===n&&(x.machine||'')===m)), out=[];
+  for(const s of sorted()){const e=s.exercises.find(x=>x.name.toLowerCase()===n&&(!any||(x.machine||'')===m));if(!e)continue;const ms=mainSets(e.sets);if(!ms.length)continue;
     const top=ms.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a);
     out.push({date:s.date,w:top.w,r:top.r,e:e1rm(top.w,top.r),sets:ms,sid:s.id,muscle:e.muscle,late:!!e.late})}
   let best=-1; out.forEach(p=>{p.pr=best>=0&&p.e>best+1e-9;best=Math.max(best,p.e)});
@@ -1929,7 +1989,14 @@ function runWhy(e){
     C().why=C().why||{}; C().why[name]={date:todayISO(),w:tg.w,r:tg.r,text:t.slice(0,300)};
   });
 }
-const aiMode=()=>coachReady();
+/* Coach mode: ai = AI decides every set; hybrid = the app decides, AI only for unusual sets; builtin = no AI during workouts */
+const coachMode=()=>S.settings.coachMode||'ai';
+const aiMode=()=>coachReady()&&coachMode()!=='builtin';
+/* how sure the app's own logic is about the next call */
+function confidence(e,j){const s=e.sets[j],r=s&&s.read||{},L=liftSessions(e.name).length;let c=0;
+  if(L>=3)c+=2;else if(L>=1)c+=1; if(fatigueFor(e.name))c+=1;
+  if(r.pain||r.mismatch||(r.drop||0)>=3)c-=3; if(r.away||r.longRest)c-=1; if(s&&s.why)c-=1;
+  return c>=3?'high':c>=1?'medium':'low'}
 function trainCtx(){const t=S.profile.train||{},g=t.target;return {experience:t.exp||null,goal:t.goal==='recomp'?'Lean and fit: build muscle and lose belly fat at the same time':t.goal||null,goalDate:g&&g.date||null,daysToGoal:g&&g.date?diffDays(todayISO(),g.date):null,goalLooksLike:g&&g.text||null,usualEffort:t.effort||null,trainsAt:t.where||null,sessionMinutes:t.mins||null,protect:t.protect||null}}
 function phaseCtx(){const ph=phaseNow(),p=prog();return {phase:ph.key==='block'?'Muscle-building block':ph.label,week:ph.wk,weeksInBlock:ph.len,repsInReserveThisWeek:ph.rir,guidance:effortText(ph),mode:p.mode,
   priorityMuscles:p.priority,weeklySets:Object.fromEntries(VGROUPS.map(m=>[m,{target:volTarget(m),doneThisWeek:doneThisWeek(m)}])),lastVolumeChanges:p.volLog&&p.volLog.changes||null,
@@ -1946,7 +2013,7 @@ function setCheck(name,w,r,rir,ref){
   return w>=Math.min(ref*0.9,ref-st)-0.06&&w<=ref+st+0.06&&w>=0;
 }
 /* ---------- AI trainer: plans the session and decides every set ---------- */
-const TRAINER=`\nSignals per set (measured by the app): restTakenSec vs restPlannedSec, restOverrunSec (late start), offAppSec (seconds outside the app during that rest, usually on their phone), inAppTaps, userWeightChange (they changed the suggested weight themselves), strain 0-100 (app estimate: under 30 easy, 30-55 working, 55-78 hard, 78+ struggling), pctOfBest (this set vs their best ever on this lift). A long rest caused mostly by phone time is distraction, not fatigue: keep the plan and, if it keeps happening, gently ask them to keep rest on time. A long rest with little phone time, rising strain, or falling reps means real fatigue: hold or reduce. Session signals show how the whole workout is going.\nYou are standing next to the lifter as their personal trainer during this workout. Decide every set: weight, reps, reps in reserve ("effort", 0 = failure) and rest in seconds. Talk like a calm, experienced trainer: short, direct, encouraging, specific. Effort feel: easy ≈ 3+ reps left, good ≈ 2, hard ≈ 0-1. Respect the phase guidance, the lifter's profile, today's feeling and their chosen focus. Only use effort 0 when failureAllowed is true. Never more than one weight step up from the last set and never more than 15% down. For a first-time exercise pick a conservative starting weight from the profile and similar lifts, then adjust from how the set went.`;
+const TRAINER=`\nSignals per set (measured by the app): restTakenSec vs restPlannedSec, restOverrunSec (late start), offAppSec (seconds outside the app during that rest, usually on their phone), inAppTaps, userWeightChange (they changed the suggested weight themselves), strain 0-100 (app estimate: under 30 easy, 30-55 working, 55-78 hard, 78+ struggling), pctOfBest (this set vs their best ever on this lift). setSec and secPerRep: how long the set took and seconds per rep (compare with earlier sets: much slower means grinding). appReading: the app's own interpretation of the set (long rest while away from the app = probably talking or on the phone; feel vs numbers mismatch; pain). whyChanged: why the lifter changed the suggested weight. pain: true means never add weight to this exercise today. Before deciding, write "read": one or two plain sentences on WHY this set went the way it did, using these numbers (rest, time away, pace, reps vs target, feel). A long rest caused mostly by phone time is distraction, not fatigue: keep the plan and, if it keeps happening, gently ask them to keep rest on time. A long rest with little phone time, rising strain, or falling reps means real fatigue: hold or reduce. Session signals show how the whole workout is going.\nYou are standing next to the lifter as their personal trainer during this workout. Decide every set: weight, reps, reps in reserve ("effort", 0 = failure) and rest in seconds. Talk like a calm, experienced trainer: short, direct, encouraging, specific. Effort feel: easy ≈ 3+ reps left, good ≈ 2, hard ≈ 0-1. Respect the phase guidance, the lifter's profile, today's feeling and their chosen focus. Only use effort 0 when failureAllowed is true. Never more than one weight step up from the last set and never more than 15% down. For a first-time exercise pick a conservative starting weight from the profile and similar lifts, then adjust from how the set went.`;
 function sessionSignals(){
   const a=S.active; if(!a) return null;
   const done=a.exercises.flatMap(e=>e.sets.filter(x=>x.done)), st=done.map(x=>x.strain).filter(v=>v!=null);
@@ -2019,6 +2086,7 @@ function flushPending(){const c=C();if(!online()||!coachReady()||!c.pending||!c.
 function coachSay(text,eid){ui.coachSay={text:text.slice(0,200),eid,t:Date.now()};buzz(8)}
 function queueAiSet(e,j){
   if(!aiMode()||!online()) return;
+  if(coachMode()==='hybrid'&&confidence(e,j)!=='low'){ev('ai-not-needed',`${e.name} set ${j+1}: app confident`);return}
   if(ui.aiPend){clearTimeout(ui.aiPend.t);ui.aiPend=null}
   ui.aiPend={eid:e.id,j,t:setTimeout(()=>{ui.aiPend=null;runNextSet(e,j)},5000)};
 }
@@ -2031,13 +2099,13 @@ function runNextSet(e,j){
   ui.busy[key]=true; rerender();
   const L=liftSessions(e.name);
   const data={...sessCtx(),exercise:{name:e.name,muscle:e.muscle,step:stepFor(e.name),failureAllowed:failureOK(e.name),repRange:e.tg?[e.tg.lo,e.tg.hi]:null,plannedSetsLeft:remaining,extraSetsSoFar:extras,firstTime:!L.length},
-    today:e.sets.filter(x=>x.done).map((x,k)=>({set:k+1,weight:r1(toDisp(x.w)),reps:x.r,targetReps:x.r0||null,plannedEffort:x.rir,feel:x.feel||null,strain:x.strain??null,pctOfBest:x.pctBest??null,...(x.sig||{})})),
+    today:e.sets.filter(x=>x.done).map((x,k)=>({set:k+1,weight:r1(toDisp(x.w)),reps:x.r,targetReps:x.r0||null,plannedEffort:x.rir,feel:x.feel||null,strain:x.strain??null,pctOfBest:x.pctBest??null,appReading:x.read?x.read.text:null,pain:!!x.pain,whyChanged:x.why?WHY_TXT[x.why]:null,...(x.sig||{})})),
     session:sessionSignals(),
     history:L.slice(-5).map(x=>({date:x.date,sets:x.sets.map(z=>z.f?[r1(toDisp(z.w)),z.r,z.f]:[r1(toDisp(z.w)),z.r])}))};
   const instr=remaining>0
     ?`Set ${j+1} of "${e.name}" is done. Decide: "continue" with the next set (weight, reps, effort, rest), or "done" to stop this exercise now if more sets would not help (e.g. form breaking down, big rep drop). "say" = what you tell the lifter now, under 22 words, mention the next weight and reps if continuing.`
     :`That was the last planned set of "${e.name}". Decide: "extra" for one more set if they clearly have more in the tank and it helps their goal (extraSetsSoFar must stay under 2), otherwise "done". If "extra", give weight, reps, effort and rest. "say" = what you tell the lifter now, under 22 words.`;
-  coachJSON('trainer',{type:'object',additionalProperties:false,required:['decision','weight','reps','effort','rest','say'],properties:{decision:{type:'string',enum:['continue','extra','done']},weight:{type:'number'},reps:{type:'integer'},effort:{type:'integer'},rest:{type:'integer'},say:{type:'string'}}},
+  coachJSON('trainer',{type:'object',additionalProperties:false,required:['decision','weight','reps','effort','rest','say','read'],properties:{read:{type:'string'},decision:{type:'string',enum:['continue','extra','done']},weight:{type:'number'},reps:{type:'integer'},effort:{type:'integer'},rest:{type:'integer'},say:{type:'string'}}},
     [{role:'system',content:SYS+TRAINER},{role:'user',content:instr+'\n\nDATA:\n'+JSON.stringify(data)}],{effort:'low'})
   .then(out=>{
     if(S.active!==a||!s.done||`${s.w}|${s.r}|${s.feel||''}`!==snap) return;
@@ -2136,6 +2204,9 @@ function coachSettings(){
   const sw=(a,on,label)=>`<button class="sw tap" role="switch" aria-checked="${on}" aria-label="${label}" data-a="${a}"></button>`;
   return `<div class="sec" id="coach-settings"><h2>AI Coach</h2>${k?`<span class="badge">Key saved</span>`:''}</div>
   <section class="card" style="gap:10px">
+   <div class="sl-t" style="flex:none"><span style="font-weight:600">Who coaches your sets</span><span class="faint">Flowfit logs the app’s and the AI’s call on every set either way, so the built-in coach keeps learning.</span></div>
+   <div class="mode-opts" role="group" aria-label="Coach mode">${[['ai','AI','AI decides every set'],['hybrid','Hybrid','App decides, AI for unusual sets'],['builtin','Built-in','No AI. Works offline']].map(([v,l,d])=>`<button class="tap" aria-pressed="${coachMode()===v}" data-a="setCoachMode" data-v="${v}"><b>${l}</b><span>${d}</span></button>`).join('')}</div>
+   ${coachMode()!=='builtin'&&!(c.on&&k)?`<span class="sm c-orange">AI needs Coach on and a key below. Until then the built-in coach runs everything.</span>`:''}
    <div class="set-line"><span>AI Coach</span>${sw('coachToggle',c.on,'AI Coach on or off')}</div>
    <div class="faint" style="font-size:12px;margin-top:-6px;line-height:1.5">${c.on?(k?'On: Coach plans your sets when you start and decides each next set. The app’s rules step in if Coach is slow or offline.':'On, but needs your Groq or Claude key below. Until then the app’s rules run everything.'):'Off: the app’s own rules set targets and adjust every set. Works offline.'}</div>
    ${c.on?`<div><label class="flabel" for="gkey">Groq or Claude API key</label><div class="row"><input id="gkey" class="field grow" type="${ui.showKey?'text':'password'}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="gsk_… or sk-ant-…" value="${esc(k)}"><button class="sq tap" data-a="keyShow" aria-label="${ui.showKey?'Hide key':'Show key'}">${I('eye',18)}</button></div></div>
@@ -2175,14 +2246,18 @@ function viewProfile(){
    <section class="tile"><div class="top">30-day<span class="c-teal">${I('calendar',18)}</span></div><div class="v">${c30}%<small>done</small></div><div class="minibars" style="height:26px;gap:2px">${days30.map(x=>`<i class="${x?'on':''}" style="height:${x?100:25}%"></i>`).join('')}</div></section>
    <section class="tile"><div class="top">This year<span class="c-violet">${I('target',18)}</span></div><div class="v">${cY}%<small>done</small></div><div class="segs">${[0,1,2,3,4,5,6,7,8,9].map(k=>`<i class="${cY>=(k+1)*10?'on':''}"></i>`).join('')}</div></section></div>
   <div class="sec"><h2>Settings</h2></div>
-  <section class="card" style="gap:6px">
-   <div class="set-line"><span>Appearance</span>${seg('theme',S.settings.theme,['auto','dark','light'])}</div>
-   ${updLine()}
-   ${sheetLine()}
-   <div class="set-line"><span>Units</span>${seg('unit',S.settings.unit,['kg','lb'])}</div>
-   <div class="set-line"><span>Workouts per week</span><div class="mini-step"><button class="tap" data-a="freq" data-d="-1" aria-label="Fewer per week">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="freq" value="${p.freq}" aria-label="Workouts per week"><span>×</span></label><button class="tap" data-a="freq" data-d="1" aria-label="More per week">${I('plus',16)}</button></div></div>
+  <section class="card set-card">
+   <div class="set-grp">Workout</div>
+   <div class="set-line"><div class="sl-t"><span>Units</span><span class="faint">For every weight in the app</span></div>${seg('unit',S.settings.unit,['kg','lb'])}</div>
+   <div class="set-line"><div class="sl-t"><span>Workouts per week</span><span class="faint">Sets your weekly targets</span></div><div class="mini-step"><button class="tap" data-a="freq" data-d="-1" aria-label="Fewer per week">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="freq" value="${p.freq}" aria-label="Workouts per week"><span>×</span></label><button class="tap" data-a="freq" data-d="1" aria-label="More per week">${I('plus',16)}</button></div></div>
+   <div class="set-line"><div class="sl-t"><span>Rest between sets</span><span class="faint">Default for new exercises. Flowfit learns your best rest per exercise.</span></div><div class="mini-step"><button class="tap" data-a="restDef" data-d="-15" aria-label="Shorter rest">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="rest" value="${S.settings.rest}" aria-label="Rest in seconds"><span>s</span></label><button class="tap" data-a="restDef" data-d="15" aria-label="Longer rest">${I('plus',16)}</button></div></div>
    <div class="set-line"><div class="sl-t"><span>Exercise pictures</span><span class="faint">Shows how to do each move (needs internet)</span></div><button class="sw tap" role="switch" aria-checked="${guidesOn()}" aria-label="Exercise pictures" data-a="guidesToggle"></button></div>
-   <div class="set-line"><div class="sl-t"><span>Rest between sets</span><span class="faint">For exercises you add</span></div><div class="mini-step"><button class="tap" data-a="restDef" data-d="-15" aria-label="Shorter rest">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="rest" value="${S.settings.rest}" aria-label="Rest in seconds"><span>s</span></label><button class="tap" data-a="restDef" data-d="15" aria-label="Longer rest">${I('plus',16)}</button></div></div></section>
+   <div class="set-grp">Look</div>
+   <div class="set-line"><span>Appearance</span>${seg('theme',S.settings.theme,['auto','dark','light'])}</div>
+   <div class="set-grp">Sync and updates</div>
+   ${sheetLine()}
+   ${updLine()}
+  </section>
   ${trainingCards()}
   ${coachSettings()}
   <div class="sec"><h2>Your data</h2></div>
@@ -2364,6 +2439,9 @@ function updLine(){
   const sub=ui.updBusy?'Checking…':ready?`Build ${u.latest} is ready. It downloads, then tap Install. Your data stays.`:b?`Build ${b}${u&&u.checked?' · up to date':''}`:'Test copy (not from GitHub)';
   return `<div class="set-line"><div class="sl-t"><span>App version</span><span class="faint">${esc(sub)}</span></div>${ready?`<button class="btn btn-primary btn-sm tap" style="flex:none" data-a="updInstall">Update</button>`:`<button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="updCheck" ${ui.updBusy?'disabled':''}>Check</button>`}</div>`;
 }
+function machineLine(e,i){if(!MACHINE_RX.test(e.name)&&!e.machine&&!(S.mach&&S.mach[incKey(e.name)]))return '';
+  const m=e.machine||'', locked=e.sets.some(x=>x.done);
+  return `<div class="mach-line"><span class="sm muted">Machine</span><div class="seg sm" role="group" aria-label="Which machine">${['','A','B','C'].map(v=>`<button class="tap" aria-pressed="${m===v}" data-a="setMach" data-i="${i}" data-v="${v}" ${locked&&m!==v?'disabled':''}>${v||'Usual'}</button>`).join('')}</div></div>`}
 /* index to move an exercise to when its machine is busy: right after the next one you haven't finished */
 function nextOpenAfter(i){const a=S.active;if(!a)return 0;for(let k=i+1;k<a.exercises.length;k++){const x=a.exercises[k];if(!x.skipped&&x.sets.some(s=>!s.done))return k}return 0}
 /* ---- Google Sheets sync: everything goes to the user's own sheet through a small Apps Script link ---- */
@@ -2375,15 +2453,15 @@ const cell=v=>{if(v==null)return '';if(typeof v==='number')return isFinite(v)?Ma
 const hhmm=t=>{if(!t)return '';const d=new Date(t);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
 const flatTxt=v=>typeof v==='string'||typeof v==='number'?String(v):Array.isArray(v)?v.map(flatTxt).filter(Boolean).join('\n'):v&&typeof v==='object'?Object.values(v).map(flatTxt).filter(Boolean).join(' · '):'';
 const SHEET_TABS={
-  Workouts:['ID','Date','Week of','Day','Start','End','Minutes','Sets','Drop sets','Volume (kg)','Ready','Sleep','Energy','Joint pain','Block week','Skipped','Coach said','App build'],
-  Sets:['ID','Date','Week of','Day','Exercise','Muscle','Set','Weight (kg)','Reps','Target reps','Reps left (aim)','Felt','Drop set','Extra set','Strain','Rest taken (s)','Coach note','Weight step','Done at','Set time (s)','Sec per rep','Rest planned (s)','Rest over/under (s)','You changed weight','You changed reps','Off app (s)','Taps','Min into workout'],
+  Workouts:['ID','Date','Week of','Day','Start','End','Minutes','Sets','Drop sets','Volume (kg)','Ready','Sleep','Energy','Joint pain','Block week','Skipped','Coach said','App build','Readiness','Coach mode'],
+  Sets:['ID','Date','Week of','Day','Exercise','Muscle','Set','Weight (kg)','Reps','Target reps','Reps left (aim)','Felt','Drop set','Extra set','Strain','Rest taken (s)','Coach note','Weight step','Done at','Set time (s)','Sec per rep','Rest planned (s)','Rest over/under (s)','You changed weight','You changed reps','Off app (s)','Taps','Min into workout','App read','Why you changed it','Pain','Machine'],
   Targets:['ID','Date','Week of','Exercise','Target','Type','Why','Rule used','Last time','Rep range','Weight step','Reps before next jump','Lift status','Block week','Coach changed it from','Best set done','Hit target','App target','AI target','Hit app target','Hit AI target'],
   Coach:['ID','Date','Time','Kind','Question / task','Answer','Used by app','Error','Provider','Model','Full prompt','Raw answer'],
   Body:['ID','Date','Weight (kg)'],
-  Decisions:['ID','Date','Time','Exercise','Set','Weight','Reps','Target reps','Reps left (aim)','Felt','Strain','Rest taken (s)','Set time (s)','Min into workout','Ready','Block week','App says','App weight','App reps','App why','AI says','AI weight','AI reps','AI rest (s)','AI message','You did','Your weight','Your reps','App and AI agree','App reps off by','AI reps off by','Followed app','Followed AI'],
+  Decisions:['ID','Date','Time','Exercise','Set','Weight','Reps','Target reps','Reps left (aim)','Felt','Strain','Rest taken (s)','Set time (s)','Min into workout','Ready','Block week','App says','App weight','App reps','App why','AI says','AI weight','AI reps','AI rest (s)','AI message','You did','Your weight','Your reps','App and AI agree','App reps off by','AI reps off by','Followed app','Followed AI','App read','AI read','App predicted reps','App confidence'],
   Events:['ID','Date','Time','Type','Detail','App build'],
-  Model:['ID','Type','Name','Sessions','First','Last','Best set','Est. max now (kg)','Est. max 4 wks ago','Change %','Change % per week','Avg reps lost per set','Median rest (s)','Median sec per rep','Weight step','Targets hit / sets per week','Avg days between','Status','Updated'],
-  Scorecard:['ID','Week of','Set decisions','AI answered','Agree %','App reps off (avg)','AI reps off (avg)','Followed app %','Followed AI %','Your edits','Coach errors','Coach answers rejected','App errors']
+  Model:['ID','Type','Name','Sessions','First','Last','Best set','Est. max now (kg)','Est. max 4 wks ago','Change %','Change % per week','Avg reps lost per set','Median rest (s)','Median sec per rep','Weight step','Targets hit / sets per week','Avg days between','Status','Updated','Best rest (learned, s)','Confidence data'],
+  Scorecard:['ID','Week of','Set decisions','AI answered','Agree %','App reps off (avg)','AI reps off (avg)','Followed app %','Followed AI %','Your edits','Coach errors','Coach answers rejected','App errors','AI not needed (app confident)','Pain flags']
 };
 const COACH_KIND={chat:'You asked',trainer:'Next set',session:'Workout plan',targets:'Today’s targets',report:'Coach report',recap:'Workout recap',checkin:'Weekly check-in',fix:'Fix for a lift',review:'Split review',why:'Why this target'};
 const shortAsk=t=>{t=String(t||'');const m=t.match(/^(.*?[.?!])(\s|$)/);return (m?m[1]:t).slice(0,200)};
@@ -2402,10 +2480,10 @@ function answerTxt(kind,o){
 function sessionRows(s){
   const wk=weekStart(s.date), mins=Math.max(1,Math.round((s.end-s.start)/60000)), all=s.exercises.flatMap(e=>e.sets), drops=all.filter(x=>x.d).length, ck=s.check||{};
   const ph=s.phase==='deload'?'Easy week':s.phase==='steady'?'Steady':(()=>{try{return phaseNow(s.date).label}catch(e){return s.phase||''}})();
-  const W=[[s.id,s.date,wk,s.dayName,hhmm(s.start),hhmm(s.end),mins,all.length-drops,drops,Math.round(all.reduce((a,x)=>a+x.w*x.r,0)),s.ready||'',ck.sleep||'',ck.energy||'',ck.joint?'yes':'',ph,(s.skipped||[]).join(', '),s.coachSaid||'',myBuild()||'']];
+  const W=[[s.id,s.date,wk,s.dayName,hhmm(s.start),hhmm(s.end),mins,all.length-drops,drops,Math.round(all.reduce((a,x)=>a+x.w*x.r,0)),s.ready||'',ck.sleep||'',ck.energy||'',ck.joint?'yes':'',ph,(s.skipped||[]).join(', '),s.coachSaid||'',myBuild()||'',s.readyScore!=null?s.readyScore:'',s.coachMode||'']];
   const SE=[], T=[];
   s.exercises.forEach((e,ei)=>{let n=0;
-    e.sets.forEach((x,j)=>{if(!x.d)n++;SE.push([`${s.id}-${ei}-${j}`,s.date,wk,s.dayName,e.name,e.muscle,x.d?`${n} drop`:n,x.w,x.r,x.tr||'',x.t!=null?x.t:'',x.f||'',!!x.d,!!x.x,x.st!=null?x.st:'',x.sig&&x.sig.restTakenSec!=null?x.sig.restTakenSec:'',x.c||'',e.step||'',...(()=>{const g=x.sig||{},v=k=>g[k]!=null?g[k]:'';return [v('doneAt'),v('setSec'),v('secPerRep'),v('restPlannedSec'),v('restOverrunSec'),g.userWeightChange||'',g.userRepChange||'',v('offAppSec'),v('inAppTaps'),v('minutesIntoWorkout')]})()])});
+    e.sets.forEach((x,j)=>{if(!x.d)n++;SE.push([`${s.id}-${ei}-${j}`,s.date,wk,s.dayName,e.name,e.muscle,x.d?`${n} drop`:n,x.w,x.r,x.tr||'',x.t!=null?x.t:'',x.f||'',!!x.d,!!x.x,x.st!=null?x.st:'',x.sig&&x.sig.restTakenSec!=null?x.sig.restTakenSec:'',x.c||'',e.step||'',...(()=>{const g=x.sig||{},v=k=>g[k]!=null?g[k]:'';return [v('doneAt'),v('setSec'),v('secPerRep'),v('restPlannedSec'),v('restOverrunSec'),g.userWeightChange||'',g.userRepChange||'',v('offAppSec'),v('inAppTaps'),v('minutesIntoWorkout'),x.rd||'',x.y?WHY_TXT[x.y]||x.y:'',x.p?'yes':'',e.machine||'']})()])});
     const tg=e.target; if(!tg)return; const c=tg.calc||{}, ms=e.sets.filter(x=>!x.d), top=ms.length?ms.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a):null;
     const hit=tg.kind==='new'?'':top&&tg.r?(top.w>=tg.w-1e-9&&top.r>=tg.r?'yes':'no'):'';
     T.push([`${s.id}-${ei}`,s.date,wk,e.name,tg.kind==='new'?'Find your weight':`${fmtW(tg.w)} kg × ${tg.r}`,tg.kind,tg.why||'',c.rule||'',c.last||'',c.range||'',c.step||'',c.needBeforeJump||'',c.status||'',c.phase||'',e.appTarget?`${fmtW(e.appTarget.w)} kg × ${e.appTarget.r} (${e.appTarget.why||''})`:'',top?`${fmtW(top.w)} kg × ${top.r}`:'',hit,...(()=>{const ap=e.appTarget||tg, ai=e.appTarget?tg:null, h=t=>!t||t.kind==='new'||!top?'':(top.w>=t.w-1e-9&&top.r>=t.r?'yes':'no');return [ap.kind==='new'?'Find your weight':`${fmtW(ap.w)} kg × ${ap.r}`,ai?`${fmtW(ai.w)} kg × ${ai.r}`:'',h(ap),ai?h(ai):'']})()])});
@@ -2421,25 +2499,27 @@ function decLog(e,j){try{
   const a=S.active, s=e.sets[j], nx=e.sets.findIndex((x,k)=>k>j&&!x.done&&!x.drop), g=e.sug&&e.sug.src!=='ai'&&e.sug.from===j?e.sug:null, ph=phaseNow();
   const app=nx<0?{action:'done',why:'Planned sets finished'}:{action:'continue',w:r1(toDisp(g?g.w:e.sets[nx].w)),r:g&&g.reps?g.r:e.sets[nx].r,why:g?g.why:'Keep the plan'};
   if(g&&g.w!=null&&nx>=0&&!g.reps)app.r=e.sets[nx].r;
+  const fa=fatigueFor(e.name); if(nx>=0&&fa&&Math.abs(fromDisp(app.w)-s.w)<0.01)app.pred=Math.max(1,Math.round(s.r-fa.avg-(s.read&&s.read.shortRest?1:0)));
+  app.conf=confidence(e,j);
   DEC().push({id:uid(),key:a.started,at:Date.now(),date:todayISO(),eid:e.id,ex:e.name,j,setNo:e.sets.slice(0,j+1).filter(x=>!x.drop).length,
-    sit:{w:r1(toDisp(s.w)),r:s.r,tr:s.r0||null,rir:s.rir!=null?s.rir:null,strain:s.strain!=null?s.strain:null,rest:s.sig&&s.sig.restTakenSec,setSec:s.sig&&s.sig.setSec,min:s.sig&&s.sig.minutesIntoWorkout,ready:a.ready||'',block:ph.label,sleep:a.check&&a.check.sleep||'',energy:a.check&&a.check.energy||''},
+    sit:{read:s.read?s.read.text:'',w:r1(toDisp(s.w)),r:s.r,tr:s.r0||null,rir:s.rir!=null?s.rir:null,strain:s.strain!=null?s.strain:null,rest:s.sig&&s.sig.restTakenSec,setSec:s.sig&&s.sig.setSec,min:s.sig&&s.sig.minutesIntoWorkout,ready:a.ready||'',block:ph.label,sleep:a.check&&a.check.sleep||'',energy:a.check&&a.check.energy||''},
     app});
   if(DEC().length>4000)DEC().splice(0,DEC().length-4000);
 }catch(err){ev('js-error','decLog: '+err.message)}}
 function decApp(e,j,app){const d=decFind(e,j);if(d)d.app=app}
-function decAi(e,j,out,say){const d=decFind(e,j);if(!d)return;d.ai={action:out.decision,w:out.decision==='done'?null:out.weight,r:out.decision==='done'?null:out.reps,rest:out.rest,effort:out.effort,say:say||out.say||''}}
+function decAi(e,j,out,say){const d=decFind(e,j);if(!d)return;d.aiRead=typeof out.read==='string'?out.read.slice(0,400):'';d.ai={action:out.decision,w:out.decision==='done'?null:out.weight,r:out.decision==='done'?null:out.reps,rest:out.rest,effort:out.effort,say:say||out.say||''}}
 /* when a set is ticked, it's what you "did" after the previous set's decision */
 function decFill(e,j){try{
   const s=e.sets[j]; let k=j-1; while(k>=0&&!e.sets[k].done)k--; if(k<0)return;
   const d=decFind(e,k); if(!d||d.did)return; d.did={action:s.drop?'drop':s.bonus?'extra':'continue',w:r1(toDisp(s.w)),r:s.r};
 }catch(err){}}
 function decClose(a,sess){
-  DEC().forEach(d=>{if(d.key!==a.started)return;d.sid=sess.id;const e=a.exercises.find(x=>x.id===d.eid),s=e&&e.sets[d.j];if(s){d.sit.feel=s.feel||'';if(s.strain!=null)d.sit.strain=s.strain}if(!d.did)d.did={action:'stopped'}});
+  DEC().forEach(d=>{if(d.key!==a.started)return;d.sid=sess.id;const e=a.exercises.find(x=>x.id===d.eid),s=e&&e.sets[d.j];if(s){d.sit.feel=s.feel||'';if(s.strain!=null)d.sit.strain=s.strain;if(s.read)d.sit.read=s.read.text}if(!d.did)d.did={action:'stopped'}});
 }
 /* how well did a call predict what you did? (reps off, when you used that weight) */
 function decScore(d){
   const did=d.did||{}, sc={};
-  const err=c=>c&&c.action==='continue'&&did.action&&did.w!=null&&c.w!=null&&Math.abs(did.w-c.w)<0.01?Math.abs(did.r-c.r):null;
+  const err=c=>c&&c.action==='continue'&&did.action&&did.w!=null&&c.w!=null&&Math.abs(did.w-c.w)<0.01?Math.abs(did.r-(c.pred!=null?c.pred:c.r)):null;
   sc.appErr=err(d.app); sc.aiErr=d.ai?err({...d.ai,action:d.ai.action==='extra'?'continue':d.ai.action}):null;
   const same=(c)=>c&&(c.action==='done'?did.action==='stopped':did.action&&did.action!=='stopped'&&c.w!=null&&Math.abs(did.w-c.w)<0.01);
   sc.followedApp=d.app?!!same(d.app):null; sc.followedAi=d.ai?!!same(d.ai):null;
@@ -2461,11 +2541,13 @@ function modelRows(){
     const med=a=>{if(!a.length)return '';const b=[...a].sort((x,y)=>x-y);return b[Math.floor(b.length/2)]};
     const gaps=L.slice(1).map((x,i)=>diffDays(L[i].date,x.date));
     rows.push(['ex:'+n,'Exercise',n,L.length,first.date,last.date,`${fmtW(Math.max(...L.map(x=>x.w)))} kg × ${L.reduce((m,x)=>x.w>=m.w?x:m,L[0]).r}`,Math.round(last.e*10)/10,Math.round(old.e*10)/10,Math.round(ch*10)/10,Math.round(ch/days*7*10)/10,
-      drops.length?Math.round(drops.reduce((a,b)=>a+b,0)/drops.length*10)/10:'',med(rests),med(spr),`${stepFor(n)} kg (${hasInc(n)?'you set it':learnedStep(n)?'learned':'default'})`,tg?Math.round(hit/tg*100)+'%':'',gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length*10)/10:'',liftStatus(n).label,t]);
+      drops.length?Math.round(drops.reduce((a,b)=>a+b,0)/drops.length*10)/10:'',med(rests),med(spr),`${stepFor(n)} kg (${hasInc(n)?'you set it':learnedStep(n)?'learned':'default'})`,tg?Math.round(hit/tg*100)+'%':'',gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length*10)/10:'',liftStatus(n).label,t,restFor(n)||'',(()=>{const f=fatigueFor(n);return `${L.length} sessions, ${f?f.n:0} set-to-set samples`})()]);
   });
+  rows.push(['g:strength','You','Strength curve',S.sessions.length,'','','','','','','','','','','',`reps-vs-weight factor ${strengthK()} (textbook 30)`,'','',t,'','']);
+  rows.push(['g:late','You','Doing an exercise later',S.sessions.length,'','','','','','','','','','','',`about ${latePenalty()} rep(s) fewer`,'','',t,'','']);
   VGROUPS.forEach(m=>{const ss=S.sessions.filter(s=>!s.demo&&s.exercises.some(e=>e.muscle===m)).map(s=>s.date).sort();if(!ss.length)return;
     const gaps=ss.slice(1).map((d,i)=>diffDays(ss[i],d)).filter(g=>g>0), wk=S.sessions.filter(s=>diffDays(s.date,t)<14).reduce((a,s)=>a+s.exercises.filter(e=>e.muscle===m).reduce((b,e)=>b+e.sets.filter(x=>!x.d).length,0),0)/2;
-    rows.push(['mu:'+m,'Muscle',m,ss.length,ss[0],ss.at(-1),'','','','','','','','','',`target ${volTarget(m)??''} sets/wk, doing ${Math.round(wk*10)/10}`,gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length*10)/10:'','',t])});
+    rows.push(['mu:'+m,'Muscle',m,ss.length,ss[0],ss.at(-1),'','','','','','','','','',`target ${volTarget(m)??''} sets/wk, doing ${Math.round(wk*10)/10}`,gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length*10)/10:'','',t,'',''])});
   return rows;
 }
 function scoreRows(){
@@ -2476,14 +2558,14 @@ function scoreRows(){
     const avg=(f)=>{const v=L.map(f).filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*100)/100:''};
     const inWk=x=>weekStart(x.date)===w;
     const sets=S.sessions.filter(s=>weekStart(s.date)===w).flatMap(s=>s.exercises.flatMap(e=>e.sets)), ov=sets.filter(x=>x.sig&&((x.sig.userWeightChange||0)!==0||(x.sig.userRepChange||0)!==0)).length;
-    return ['wk:'+w,w,L.length,L.filter(x=>x.d.ai).length,pct(x=>x.sc.agree),avg(x=>x.sc.appErr),avg(x=>x.sc.aiErr),pct(x=>x.sc.followedApp),pct(x=>x.sc.followedAi),ov,evs.filter(x=>inWk(x)&&x.type==='ai-error').length,evs.filter(x=>inWk(x)&&x.type==='ai-rejected').length,evs.filter(x=>inWk(x)&&x.type==='js-error').length]});
+    return ['wk:'+w,w,L.length,L.filter(x=>x.d.ai).length,pct(x=>x.sc.agree),avg(x=>x.sc.appErr),avg(x=>x.sc.aiErr),pct(x=>x.sc.followedApp),pct(x=>x.sc.followedAi),ov,evs.filter(x=>inWk(x)&&x.type==='ai-error').length,evs.filter(x=>inWk(x)&&x.type==='ai-rejected').length,evs.filter(x=>inWk(x)&&x.type==='js-error').length,evs.filter(x=>inWk(x)&&x.type==='ai-not-needed').length,evs.filter(x=>inWk(x)&&x.type==='pain').length]});
 }
 function decRow(d){const sc=decScore(d),a=d.app||{},ai=d.ai||{},did=d.did||{},s=d.sit||{};
   const say=c=>!c||!c.action?'':c.action==='done'?'Stop':c.action==='extra'?'Extra set':c.action==='continue'?'Next set':c.action;
   return [d.id,d.date,hhmm(d.at),d.ex,d.setNo,s.w,s.r,s.tr||'',s.rir!=null?s.rir:'',s.feel||'',s.strain!=null?s.strain:'',s.rest!=null?s.rest:'',s.setSec!=null?s.setSec:'',s.min!=null?s.min:'',s.ready||'',s.block||'',
     say(a),a.w!=null?a.w:'',a.r!=null?a.r:'',a.why||'',say(ai),ai.w!=null?ai.w:'',ai.r!=null?ai.r:'',ai.rest!=null?ai.rest:'',ai.say||'',
-    did.action==='stopped'?'Stopped':did.action==='drop'?'Drop set':did.action==='extra'?'Extra set':did.action?'Next set':'',did.w!=null?did.w:'',did.r!=null?did.r:'',sc.agree==null?'':sc.agree?'yes':'no',sc.appErr!=null?sc.appErr:'',sc.aiErr!=null?sc.aiErr:'',sc.followedApp==null?'':sc.followedApp?'yes':'no',sc.followedAi==null?'':sc.followedAi?'yes':'no']}
-const SYNC_V=3; /* bump when sheet columns change: everything is re-sent once */
+    did.action==='stopped'?'Stopped':did.action==='drop'?'Drop set':did.action==='extra'?'Extra set':did.action?'Next set':'',did.w!=null?did.w:'',did.r!=null?did.r:'',sc.agree==null?'':sc.agree?'yes':'no',sc.appErr!=null?sc.appErr:'',sc.aiErr!=null?sc.aiErr:'',sc.followedApp==null?'':sc.followedApp?'yes':'no',sc.followedAi==null?'':sc.followedAi?'yes':'no',s.read||'',d.aiRead||'',a.pred!=null?a.pred:'',a.conf||'']}
+const SYNC_V=4; /* bump when sheet columns change: everything is re-sent once */
 function pendingRows(all){
   const y=SY(); all=all||y.v!==SYNC_V; y.d=y.d||{}; y.e=y.e||0; const out={Workouts:[],Sets:[],Targets:[],Coach:[],Body:[],Decisions:[],Events:[],Model:[],Scorecard:[]}, mark={s:{},b:{},c:y.c,d:{},e:y.e,m:null,sc:null};
   S.sessions.filter(s=>!s.demo).forEach(s=>{const h=hsh(s);if(!all&&y.s[s.id]===h)return;const r=sessionRows(s);Object.keys(r).forEach(k=>out[k].push(...r[k]));mark.s[s.id]=h});
@@ -2520,7 +2602,7 @@ function sheetLine(){
   const sub=!u?'Send every workout, set, target and Coach answer to your own sheet':ui.syncing?'Syncing…':ui.syncErr?`Last try failed: ${ui.syncErr}`:p?`${p} row${p>1?'s':''} waiting${y.last?` · last sync ${fmtD(iso(new Date(y.last)))} ${hhmm(y.last)}`:''}`:y.last?`All synced · ${fmtD(iso(new Date(y.last)))} ${hhmm(y.last)}`:'Connected';
   return `<div class="set-line"><div class="sl-t"><span>Google Sheets</span><span class="faint">${esc(sub)}</span></div><button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="openSheetSync">${u?'Manage':'Connect'}</button></div>`;
 }
-function setInc(name,v){incs()[incKey(name)]=fromDisp(v);refreshDraft();closeSheet();render();buzz(15);toast(`${name}: goes up in ${v} ${U()} steps`)}
+function setInc(name,v){incs()[stepKey(name)]=fromDisp(v);refreshDraft();closeSheet();render();buzz(15);toast(`${name}: goes up in ${v} ${U()} steps`)}
 function openSheet(name){
   const was=!!ui.sheet; ui.sheet=name; const r=$('#sheetRoot'); r.classList.remove('closing');
   if(!was){ovOpen();const old=$('#sheetRoot .sheet'),sd=$('#sheetRoot .shade');if(old){old.style.transform='';old.style.transition=''}if(sd){sd.style.opacity='';sd.style.transition=''}}
@@ -2659,7 +2741,12 @@ const act={
     setTimeout(()=>{const el=document.getElementById('ex-'+e.id);if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},60)},
   later(d){const a=S.active,i=+d.i,j=nextOpenAfter(i);if(!j)return;ev('later',a.exercises[i].name);const [e]=a.exercises.splice(i,1);e.later=true;
     a.exercises.splice(j,0,e);ui.openEx=null;
-    if(e.tg&&e.tg.kind!=='new'&&COMPOUND_RX.test(e.name)){const r=Math.max(1,e.tg.r-1);e.tg={...e.tg,r,why:e.tg.why+'. Doing it later today, so one rep fewer is fine'};e.sets.forEach(x=>{if(!x.done&&!x.drop){x.r=r;x.r0=r}})}buzz(15);toast(`${e.name} moved after ${a.exercises[j-1].name}`);render()},
+    const lp=latePenalty();if(e.tg&&e.tg.kind!=='new'&&lp>0){const r=Math.max(1,e.tg.r-lp);e.tg={...e.tg,r,why:e.tg.why+`. Doing it later today, so ${lp} rep${lp>1?'s':''} fewer is fine`};e.sets.forEach(x=>{if(!x.done&&!x.drop){x.r=r;x.r0=r}})}buzz(15);toast(`${e.name} moved after ${a.exercises[j-1].name}`);render()},
+  setMach(d){const a=S.active,e=a&&a.exercises[+d.i];if(!e||e.sets.some(x=>x.done))return;if(!S.mach)S.mach={};
+    if(d.v)S.mach[incKey(e.name)]=d.v;else delete S.mach[incKey(e.name)];e.machine=d.v||'';_lsKey='';
+    const pe=planEx(e.name)||{reps:e.tg?e.tg.lo:10,repsHi:e.tg?e.tg.hi:12,sets:e.sets.length,muscle:e.muscle};const tg=targetFor({...pe,name:e.name});e.tg=tg;delete e.sug;delete e.tgApp;
+    e.sets.forEach(x=>{x.w=tg.w;x.r=tg.r;delete x.r0;delete x.edited});ev('machine',`${e.name}: ${d.v||'usual'}`);buzz(10);render();
+    toast(d.v?`${e.name}: machine ${d.v}. Targets use its own history`:`${e.name}: usual machine`)},
   addSet(d){const e=S.active.exercises[d.i],l=e.sets[e.sets.length-1];e.sets.push({w:l.w,r:l.r,done:false});ui.curSet[e.id]=e.sets.length-1;render()},
   rmSet(d){const e=S.active.exercises[d.i];if(e.sets.length>1)e.sets.pop();delete ui.curSet[e.id];render()},
   skip(d){const e=S.active.exercises[d.i];e.skipped=!e.skipped;ev(e.skipped?'skip':'unskip',e.name);render()},
@@ -2679,7 +2766,7 @@ const act={
   openInc(d){ui.incName=d.n;openSheet('inc')},
   incPick(d){setInc(ui.incName,+d.v)},
   incSave(){const v=parseFloat((($('#incIn')||{}).value||'').replace(',','.'));if(!(v>0&&v<=50)){toast('Enter a number, like 5 or 7');buzz([10,40,10]);return}setInc(ui.incName,v)},
-  incReset(){delete incs()[incKey(ui.incName)];refreshDraft();closeSheet();render();toast('Back to the default step')},
+  incReset(){delete incs()[stepKey(ui.incName)];refreshDraft();closeSheet();render();toast('Back to the default step')},
   editEx(d){ui.editEx=+d.i;openSheet('exercise')},
   saveEx(){
     const name=$('#exName').value.trim(), sets=parseInt($('#exSets').value,10), rm=$('#exReps').value.match(/(\d+)(?:\s*[-–]\s*(\d+))?/), rest=parseInt($('#exRest').value,10), err=$('#exErr');
@@ -2690,7 +2777,7 @@ const act={
     const obj={name,muscle:$('#exMuscle').value,sets,reps,repsHi:hi,rest:clamp(rest||S.settings.rest,10,600)};
     const d=S.plan[ui.planDay], isNew=ui.editEx==null;
     const iv=parseFloat(($('#exInc')&&$('#exInc').value||'').replace(',','.'));
-    if(iv>0&&iv<=50&&(hasInc(name)||Math.abs(iv-stepFor(name))>0.01))incs()[incKey(name)]=fromDisp(iv);
+    if(iv>0&&iv<=50&&(hasInc(name)||Math.abs(iv-stepFor(name))>0.01))incs()[stepKey(name)]=fromDisp(iv);
     /* best order: big multi-joint lifts first while you're fresh, then single-muscle work */
     if(isNew){const ne={id:uid(),...obj},fi=COMPOUND_RX.test(name)?d.exercises.findIndex(x=>!COMPOUND_RX.test(x.name)):-1;if(fi>=0)d.exercises.splice(fi,0,ne);else d.exercises.push(ne)} else Object.assign(d.exercises[ui.editEx],obj);
     refreshDraft();closeSheet();render();buzz(15);toast(isNew?`Added ${name}`:'Saved');
@@ -2729,6 +2816,7 @@ const act={
   copyBackup(){const txt=backupText();try{navigator.clipboard.writeText(txt).then(()=>toast('Backup copied'),()=>openSheet('backup'))}catch(e){openSheet('backup')}},
   saveBackupFile(){saveBackupFile()},
   updCheck(){checkUpdate(true)},
+  setCoachMode(d){S.settings.coachMode=d.v;ev('coach-mode',d.v);buzz(10);save();render();toast({ai:'AI coaches every set',hybrid:'Hybrid: the app coaches, AI steps in for unusual sets',builtin:'Built-in coach: no AI during workouts'}[d.v])},
   openSheetSync(){openSheet('sheetsync')},
   async shSave(){const v=(($('#shUrl')||{}).value||'').trim();
     if(!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(v)){toast('Paste the link that starts with https://script.google.com/');buzz([10,40,10]);return}
@@ -2790,7 +2878,10 @@ const act={
     if(!(aiMode()&&online())&&maybeBonus(e,+d.j)){render();return}
     if(!(e.sug&&e.sug.src==='ai'))adjustNext(e,+d.j);
     if(ui.aiPend&&ui.aiPend.eid===e.id&&ui.aiPend.j===+d.j){clearTimeout(ui.aiPend.t);ui.aiPend=null;runNextSet(e,+d.j)}
-    setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id&&ui.feel.j===+d.j){ui.feel=null;renderDock()}},700);render()},
+    setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id&&ui.feel.j===+d.j&&!(changedSet(s)&&!s.why)){ui.feel=null;renderDock()}},700);render()},
+  setWhy(d){const e=S.active.exercises[+d.i],s=e&&e.sets[+d.j];if(!s)return;s.why=d.v;if(d.v==='pain')s.pain=true;ev('changed-why',`${e.name} set ${+d.j+1}: ${WHY_TXT[d.v]}`);readSet(e,+d.j);if(d.v==='pain')adjustNext(e,+d.j);buzz(10);
+    if(s.feel)setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id){ui.feel=null;renderDock()}},700);render()},
+  setPain(d){const e=S.active.exercises[+d.i],s=e&&e.sets[+d.j];if(!s)return;s.pain=!s.pain;ev(s.pain?'pain':'pain-cleared',`${e.name} set ${+d.j+1} at ${fmtW(s.w)} ${U()}`);readSet(e,+d.j);adjustNext(e,+d.j);buzz(s.pain?[20,40,20]:10);render()},
   useSug(d){const e=S.active.exercises[+d.i];if(!e||!e.sug)return;const g=e.sug;ev('used-suggestion',`${e.name}: ${fmtW(g.w)} × ${g.r||''} (${g.src||'app'})`);e.sets.forEach((x,k)=>{if(!x.done){x.w=g.w;if(g.reps){x.r=g.r;x.r0=g.r}if(g.src==='ai'){x.r=g.r;x.r0=g.r;if(k===e.sets.findIndex(y=>!y.done))x.rir=g.rir}}});delete e.sug;buzz(15);render();bump('sw-'+e.id)},
   whyTarget(d){const e=S.active&&S.active.exercises[+d.i];if(e&&e.tg&&e.tg.kind!=='new')runWhy(e)},
   ptab(d){if(ui.ptab===d.v)return;ui.ptab=d.v;lastView=null;render();window.scrollTo(0,0)},
@@ -2910,7 +3001,34 @@ function computeStrain(e,j){
   if(g.userWeightChange<0)k+=10; else if(g.userWeightChange>0)k-=8;
   if(s.rir===0)k-=10;
   s.strain=clamp(Math.round(k),0,100); s.pctBest=pct;
+  try{readSet(e,j)}catch(err){ev('js-error','readSet: '+err.message)}
 }
+/* ---- reading a set: what the numbers say about why it went the way it did ---- */
+function paceFor(name,excl){const v=[];S.sessions.forEach(x=>x.exercises.forEach(e=>{if(e.name===name)e.sets.forEach(z=>{if(z.sig&&z.sig.secPerRep)v.push(z.sig.secPerRep)})}));
+  const a=S.active;if(a)a.exercises.forEach(e=>{if(e.name===name)e.sets.forEach(z=>{if(z!==excl&&z.done&&z.sig&&z.sig.secPerRep)v.push(z.sig.secPerRep)})});
+  if(v.length<3)return null;v.sort((x,y)=>x-y);return v[Math.floor(v.length/2)]}
+function readSet(e,j){
+  const s=e.sets[j]; if(!s||!s.done||s.drop)return; const g=s.sig||{}, tags=[], R={};
+  const plan=g.restPlannedSec, took=g.restTakenSec, off=g.offAppSec||0;
+  if(took!=null&&plan){
+    if(took>plan*1.5&&took-plan>45){R.longRest=true;
+      if(off>=took*0.6&&off>40){R.away=true;tags.push(`Rested ${took}s (planned ${plan}s), off the app for ${off}s: probably talking, on your phone or waiting for a machine`)}
+      else if((g.inAppTaps||0)>=12){R.inApp=true;tags.push(`Rested ${took}s (planned ${plan}s) while using the app a lot`)}
+      else tags.push(`Rested ${took}s (planned ${plan}s) with the app open: likely tired or waiting for a machine`)}
+    else if(took<plan*0.6){R.shortRest=true;tags.push(`Rested only ${took}s of ${plan}s`)}}
+  const pace=paceFor(e.name,s);
+  if(g.secPerRep&&pace){const q=g.secPerRep/pace;R.pace=Math.round(q*100);
+    if(q>1.35)tags.push(`Slower than usual: ${g.secPerRep}s per rep vs your ${pace}s (grinding, or a pause before starting)`);
+    else if(q<0.7)tags.push(`Much faster than usual: ${g.secPerRep}s per rep vs your ${pace}s, keep control`)}
+  const prev=e.sets.slice(0,j).filter(x=>x.done&&!x.drop&&Math.abs(x.w-s.w)<0.01).at(-1), drop=prev?prev.r-s.r:0; R.drop=drop;
+  if(drop>=3)tags.push(`Lost ${drop} reps from the last set`);
+  if(s.feel==='easy'&&(drop>=2||(R.pace||0)>130)){R.mismatch='harder than felt';tags.push(`You said Easy, but ${drop>=2?`reps fell by ${drop}`:'your pace slowed'}: it may be harder than it feels`)}
+  if(s.feel==='hard'&&drop<=0&&(R.pace==null||R.pace<=110)&&s.r>=(s.r0||0)){R.mismatch='easier than felt';tags.push('You said Hard, but reps and pace held: you may have more in reserve')}
+  if(s.pain){R.pain=true;tags.push('Pain on this set')}
+  if(s.why)tags.push('You changed it: '+(WHY_TXT[s.why]||s.why));
+  R.text=tags.join('. ')||'Normal set'; s.read=R;
+}
+const WHY=[['heavy','Too heavy'],['light','Too light'],['taken','Machine taken'],['other','Other machine'],['pain','Pain'],['felt','Felt like it']], WHY_TXT=Object.fromEntries(WHY);
 const strainWord=v=>v==null?'':v<30?'Easy':v<55?'Working':v<78?'Hard':'Struggling';
 function setW(e,c,kg){if(!e.sets[c].edited&&e.sets[c].pw==null)e.sets[c].pw=e.sets[c].w;e.sets[c].w=kg;e.sets[c].edited=true;for(let j=c+1;j<e.sets.length;j++)if(!e.sets[j].done)e.sets[j].w=kg;render()}
 function propR(e,c){for(let j=c+1;j<e.sets.length;j++)if(!e.sets[j].done)e.sets[j].r=e.sets[c].r}
