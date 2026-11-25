@@ -477,10 +477,6 @@ a.btn{text-decoration:none}
 /* phases, setup, feel bar */
 .ph{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mchips{display:flex;flex-wrap:wrap;gap:6px}
-.fb-why{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-.fb-pain{display:flex;justify-content:flex-end;margin-top:8px}
-.fb-pain .chip{height:32px;padding:0 12px;font-size:12.5px}
-.fb-pain .chip[aria-pressed="true"]{background:color-mix(in srgb,var(--danger) 18%,transparent);border-color:var(--danger);color:var(--danger)}
 .mchips .chip{height:34px;padding:0 13px;font-size:13px}
 .chk{display:grid;gap:8px}
 .chk-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -1305,9 +1301,8 @@ function exCard(e,i){
   return `<section class="card ex ${all?'allDone':''}" id="ex-${e.id}">
    <div class="ex-head">${mediaThumb(e.name)}<button class="nm exc-main tap" data-a="openEx" data-id="${e.id}" aria-expanded="true"><h3>${esc(e.name)}</h3><span class="mu">${mdot(e.muscle)}${esc(e.muscle)}${lp?` · last ${fmtW(lp.w)} × ${lp.sets.map(x=>x.r).join(',')}`:''}</span></button><div class="ex-acts">${e.sets.some(x=>x.done)||!nextOpenAfter(i)?'':`<button class="link plain tap" data-a="later" data-i="${i}" aria-label="Machine busy: do ${esc(e.name)} later">Later</button>`}<button class="link plain tap" data-a="skip" data-i="${i}">Skip</button></div></div>
    ${targetLine(e,i)}
-   ${machineLine(e,i)}
    <div class="steppers">
-    <div><div class="stp-l">Weight (${U()}) · set ${c+1} · <button class="link plain tap stp-inc" data-a="openInc" data-n="${esc(e.name)}" aria-label="Weight jump for ${esc(e.name)}: ${stepFor(e.name)} ${U()}${!hasInc(e.name)&&learnedStep(e.name)?', learned from your logs':''}. Change">±${stepFor(e.name)}${!hasInc(e.name)&&learnedStep(e.name)?' · learned':''}</button></div><div class="stp" id="sw-${e.id}"><button class="tap" data-a="stepW" data-i="${i}" data-d="-1" aria-label="Less weight">${I('minus',18)}</button><input id="w-${e.id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-num="dec" data-c="setW" data-i="${i}" value="${toDisp(s.w).toFixed(1)}" aria-label="Weight for set ${c+1}"><button class="tap" data-a="stepW" data-i="${i}" data-d="1" aria-label="More weight">${I('plus',18)}</button></div></div>
+    <div><div class="stp-l">Weight (${U()}) · set ${c+1} · <button class="link plain tap stp-inc" data-a="openInc" data-i="${i}" data-n="${esc(e.name)}" aria-label="Weight jump for ${esc(e.name)}: ${stepFor(e.name)} ${U()}${!hasInc(e.name)&&learnedStep(e.name)?', learned from your logs':''}. Change">±${stepFor(e.name)}${e.machine?` · machine ${e.machine}`:''}</button></div><div class="stp" id="sw-${e.id}"><button class="tap" data-a="stepW" data-i="${i}" data-d="-1" aria-label="Less weight">${I('minus',18)}</button><input id="w-${e.id}" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" data-num="dec" data-c="setW" data-i="${i}" value="${toDisp(s.w).toFixed(1)}" aria-label="Weight for set ${c+1}"><button class="tap" data-a="stepW" data-i="${i}" data-d="1" aria-label="More weight">${I('plus',18)}</button></div></div>
     <div><div class="stp-l">Reps</div><div class="stp" id="sr-${e.id}"><button class="tap" data-a="stepR" data-i="${i}" data-d="-1" aria-label="Fewer reps">${I('minus',18)}</button><input id="r-${e.id}" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="setR" data-i="${i}" value="${s.r}" aria-label="Reps for set ${c+1}"><button class="tap" data-a="stepR" data-i="${i}" data-d="1" aria-label="More reps">${I('plus',18)}</button></div></div>
    </div>
    <div class="sets">${e.sets.map((x,j)=>`<div class="set ${j===c?'cur':''} ${x.done?'done':''}" data-a="pickSet" data-i="${i}" data-j="${j}">
@@ -1376,8 +1371,7 @@ function feelBar(a){
   const e=a.exercises.find(x=>x.id===f.eid), s=e&&e.sets[f.j]; if(!s||!s.done) return '';
   return `<div class="feelbar"><div class="sm fb-l"><b>How did set ${f.j+1} feel?</b> <span class="muted">${esc(e.name)} · ${fmtW(s.w)} ${U()} × ${s.r}${s.strain!=null?` · looked ${strainWord(s.strain).toLowerCase()}`:''}</span></div>
     <div class="feel3">${[['easy','Easy'],['good','Good'],['hard','Hard']].map(([v,l])=>`<button class="tap ${s.feel===v?'on':''}" data-a="feel" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}" data-v="${v}">${l}</button>`).join('')}</div>
-    ${changedSet(s)?`<div class="fb-why"><span class="sm muted">You changed the suggestion. Why?</span><div class="mchips">${WHY.map(([v,l])=>`<button class="chip tap" aria-pressed="${s.why===v}" data-a="setWhy" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}" data-v="${v}">${l}</button>`).join('')}</div></div>`:''}
-    <div class="fb-pain"><button class="chip tap" aria-pressed="${!!s.pain}" data-a="setPain" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}">${s.pain?'Pain noted':'Felt pain?'}</button></div></div>`;
+    </div>`;
 }
 const changedSet=s=>!!(s&&s.sig&&((s.sig.userWeightChange||0)!==0||(s.sig.userRepChange||0)!==0));
 function trendCounts(a){const c={up:0,hold:0,down:0,new:0,coach:0,ai:0};a.exercises.filter(e=>!e.skipped&&e.tg).forEach(e=>c[e.tg.kind]++);return c}
@@ -2392,8 +2386,9 @@ const SHEETS={
        ${x.kind==='chat'?`<b style="font-size:15px">${esc(x.ask)}</b>`:''}
        ${x.error?`<span class="sm c-danger" style="line-height:1.45">${esc(x.error.msg)}${x.error.detail&&!String(x.error.msg).includes(String(x.error.detail).slice(0,40))?` (${esc(String(x.error.detail).slice(0,200))})`:''}</span>`:`<span class="sm" style="white-space:pre-wrap;line-height:1.5">${esc(flat(x.answer).slice(0,1500))}</span>`}</div>`).join(''):`<p class="muted" style="margin:0">Nothing yet. Ask Coach something and it shows up here.</p>`}</div>`},
   inc(){const n=ui.incName||'', cur=stepFor(n), u=U(), opts=u==='lb'?[2.5,5,10,15,20]:[1,1.25,2,2.5,4.5,5,7,10];
-    return sheetHead(esc(n),'Weight jump')+`<div class="sheet-body"><p class="muted" style="margin:0;line-height:1.5">How much does the weight go up by on this machine or rack? The + and − buttons, your targets and Coach all use this, so suggestions are weights you can actually pick.</p>
+    return sheetHead(esc(n),'Weight jump')+`<div class="sheet-body"><p class="muted" style="margin:0;line-height:1.5">How much the weight goes up by on this machine.</p>
      ${!hasInc(n)&&learnedStep(n)?`<p class="sm" style="margin:0;line-height:1.5"><span class="c-lime">Learned from your logs: ${learnedStep(n)} ${u}.</span> Pick another if that’s wrong.</p>`:''}
+     ${ui.incI!=null&&S.active&&S.active.exercises[ui.incI]&&!S.active.exercises[ui.incI].sets.some(x=>x.done)?`<div><span class="flabel">More than one of this machine at your gym?</span><div class="seg" role="group" aria-label="Which machine">${['','A','B','C'].map(v=>`<button class="tap" aria-pressed="${(S.active.exercises[ui.incI].machine||'')===v}" data-a="setMach" data-i="${ui.incI}" data-v="${v}">${v||'Usual'}</button>`).join('')}</div><div class="faint" style="font-size:12px;margin-top:6px">Each machine keeps its own weights and history.</div></div>`:''}
      <div class="mchips">${opts.map(v=>`<button class="chip tap" aria-pressed="${Math.abs(v-cur)<0.01}" data-a="incPick" data-v="${v}">${v} ${u}</button>`).join('')}</div>
      <div><label class="flabel" for="incIn">Other (${u})</label><div class="row"><input id="incIn" class="field grow tn" type="text" inputmode="decimal" data-num="dec" enterkeyhint="done" autocomplete="off" value="${cur}"><button class="btn btn-primary tap" style="flex:none" data-a="incSave">Save</button></div></div>
      ${hasInc(n)?`<div><button class="link plain tap" data-a="incReset">Use the default (${U()==='lb'?incDefaultKg(n)*2:incDefaultKg(n)} ${u})</button></div>`:''}</div>`},
@@ -2439,9 +2434,6 @@ function updLine(){
   const sub=ui.updBusy?'Checking…':ready?`Build ${u.latest} is ready. It downloads, then tap Install. Your data stays.`:b?`Build ${b}${u&&u.checked?' · up to date':''}`:'Test copy (not from GitHub)';
   return `<div class="set-line"><div class="sl-t"><span>App version</span><span class="faint">${esc(sub)}</span></div>${ready?`<button class="btn btn-primary btn-sm tap" style="flex:none" data-a="updInstall">Update</button>`:`<button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="updCheck" ${ui.updBusy?'disabled':''}>Check</button>`}</div>`;
 }
-function machineLine(e,i){if(!MACHINE_RX.test(e.name)&&!e.machine&&!(S.mach&&S.mach[incKey(e.name)]))return '';
-  const m=e.machine||'', locked=e.sets.some(x=>x.done);
-  return `<div class="mach-line"><span class="sm muted">Machine</span><div class="seg sm" role="group" aria-label="Which machine">${['','A','B','C'].map(v=>`<button class="tap" aria-pressed="${m===v}" data-a="setMach" data-i="${i}" data-v="${v}" ${locked&&m!==v?'disabled':''}>${v||'Usual'}</button>`).join('')}</div></div>`}
 /* index to move an exercise to when its machine is busy: right after the next one you haven't finished */
 function nextOpenAfter(i){const a=S.active;if(!a)return 0;for(let k=i+1;k<a.exercises.length;k++){const x=a.exercises[k];if(!x.skipped&&x.sets.some(s=>!s.done))return k}return 0}
 /* ---- Google Sheets sync: everything goes to the user's own sheet through a small Apps Script link ---- */
@@ -2746,7 +2738,7 @@ const act={
     if(d.v)S.mach[incKey(e.name)]=d.v;else delete S.mach[incKey(e.name)];e.machine=d.v||'';_lsKey='';
     const pe=planEx(e.name)||{reps:e.tg?e.tg.lo:10,repsHi:e.tg?e.tg.hi:12,sets:e.sets.length,muscle:e.muscle};const tg=targetFor({...pe,name:e.name});e.tg=tg;delete e.sug;delete e.tgApp;
     e.sets.forEach(x=>{x.w=tg.w;x.r=tg.r;delete x.r0;delete x.edited});ev('machine',`${e.name}: ${d.v||'usual'}`);buzz(10);render();
-    toast(d.v?`${e.name}: machine ${d.v}. Targets use its own history`:`${e.name}: usual machine`)},
+    closeSheet();toast(d.v?`${e.name}: machine ${d.v}. Targets use its own history`:`${e.name}: usual machine`)},
   addSet(d){const e=S.active.exercises[d.i],l=e.sets[e.sets.length-1];e.sets.push({w:l.w,r:l.r,done:false});ui.curSet[e.id]=e.sets.length-1;render()},
   rmSet(d){const e=S.active.exercises[d.i];if(e.sets.length>1)e.sets.pop();delete ui.curSet[e.id];render()},
   skip(d){const e=S.active.exercises[d.i];e.skipped=!e.skipped;ev(e.skipped?'skip':'unskip',e.name);render()},
@@ -2763,7 +2755,7 @@ const act={
   cancelConfirmSheet(){ui.confirm=null;renderSheet()},
   delDay(){const snap=JSON.stringify(S.plan),nm=S.plan[ui.planDay].name;S.plan.splice(ui.planDay,1);ui.planDay=Math.max(0,ui.planDay-1);refreshDraft();closeSheet();render();toast(`Deleted ${nm}`,()=>{S.plan=JSON.parse(snap);refreshDraft();render()})},
   addEx(){ui.editEx=null;openSheet('exercise')},
-  openInc(d){ui.incName=d.n;openSheet('inc')},
+  openInc(d){ui.incName=d.n;ui.incI=d.i!=null?+d.i:null;openSheet('inc')},
   incPick(d){setInc(ui.incName,+d.v)},
   incSave(){const v=parseFloat((($('#incIn')||{}).value||'').replace(',','.'));if(!(v>0&&v<=50)){toast('Enter a number, like 5 or 7');buzz([10,40,10]);return}setInc(ui.incName,v)},
   incReset(){delete incs()[stepKey(ui.incName)];refreshDraft();closeSheet();render();toast('Back to the default step')},
@@ -2878,10 +2870,7 @@ const act={
     if(!(aiMode()&&online())&&maybeBonus(e,+d.j)){render();return}
     if(!(e.sug&&e.sug.src==='ai'))adjustNext(e,+d.j);
     if(ui.aiPend&&ui.aiPend.eid===e.id&&ui.aiPend.j===+d.j){clearTimeout(ui.aiPend.t);ui.aiPend=null;runNextSet(e,+d.j)}
-    setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id&&ui.feel.j===+d.j&&!(changedSet(s)&&!s.why)){ui.feel=null;renderDock()}},700);render()},
-  setWhy(d){const e=S.active.exercises[+d.i],s=e&&e.sets[+d.j];if(!s)return;s.why=d.v;if(d.v==='pain')s.pain=true;ev('changed-why',`${e.name} set ${+d.j+1}: ${WHY_TXT[d.v]}`);readSet(e,+d.j);if(d.v==='pain')adjustNext(e,+d.j);buzz(10);
-    if(s.feel)setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id){ui.feel=null;renderDock()}},700);render()},
-  setPain(d){const e=S.active.exercises[+d.i],s=e&&e.sets[+d.j];if(!s)return;s.pain=!s.pain;ev(s.pain?'pain':'pain-cleared',`${e.name} set ${+d.j+1} at ${fmtW(s.w)} ${U()}`);readSet(e,+d.j);adjustNext(e,+d.j);buzz(s.pain?[20,40,20]:10);render()},
+    setTimeout(()=>{if(ui.feel&&ui.feel.eid===e.id&&ui.feel.j===+d.j){ui.feel=null;renderDock()}},700);render()},
   useSug(d){const e=S.active.exercises[+d.i];if(!e||!e.sug)return;const g=e.sug;ev('used-suggestion',`${e.name}: ${fmtW(g.w)} × ${g.r||''} (${g.src||'app'})`);e.sets.forEach((x,k)=>{if(!x.done){x.w=g.w;if(g.reps){x.r=g.r;x.r0=g.r}if(g.src==='ai'){x.r=g.r;x.r0=g.r;if(k===e.sets.findIndex(y=>!y.done))x.rir=g.rir}}});delete e.sug;buzz(15);render();bump('sw-'+e.id)},
   whyTarget(d){const e=S.active&&S.active.exercises[+d.i];if(e&&e.tg&&e.tg.kind!=='new')runWhy(e)},
   ptab(d){if(ui.ptab===d.v)return;ui.ptab=d.v;lastView=null;render();window.scrollTo(0,0)},
@@ -3025,7 +3014,8 @@ function readSet(e,j){
   if(s.feel==='easy'&&(drop>=2||(R.pace||0)>130)){R.mismatch='harder than felt';tags.push(`You said Easy, but ${drop>=2?`reps fell by ${drop}`:'your pace slowed'}: it may be harder than it feels`)}
   if(s.feel==='hard'&&drop<=0&&(R.pace==null||R.pace<=110)&&s.r>=(s.r0||0)){R.mismatch='easier than felt';tags.push('You said Hard, but reps and pace held: you may have more in reserve')}
   if(s.pain){R.pain=true;tags.push('Pain on this set')}
-  if(s.why)tags.push('You changed it: '+(WHY_TXT[s.why]||s.why));
+  const cw=g.userWeightChange||0, cr=g.userRepChange||0;
+  if(cw)tags.push(`You went ${cw<0?'lighter':'heavier'} than suggested by ${Math.abs(cw)} ${U()}`);else if(cr)tags.push(`You did ${cr<0?'fewer':'more'} reps than suggested (${cr>0?'+':''}${cr})`);
   R.text=tags.join('. ')||'Normal set'; s.read=R;
 }
 const WHY=[['heavy','Too heavy'],['light','Too light'],['taken','Machine taken'],['other','Other machine'],['pain','Pain'],['felt','Felt like it']], WHY_TXT=Object.fromEntries(WHY);
