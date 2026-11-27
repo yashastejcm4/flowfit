@@ -746,7 +746,8 @@ i.d.ok{background:var(--accent)} i.d.warn{background:var(--c-yellow)} i.d.next{b
 .ex-ic.thumb{background:var(--surface-2)}
 .ex-ic.thumb img{background:#fff}
 /* no visible scrollbars anywhere, and nothing may widen the page sideways */
-html,body{overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none}
+html,body{scrollbar-width:none;-ms-overflow-style:none}
+body,#app{overflow-x:clip} /* clip, not hidden: hidden turns body into its own scroll box, and with overscroll-behavior:none the page could not scroll */
 html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none;width:0;height:0}
 *{scrollbar-width:none}
 .chips{margin:0 calc(-1*var(--s4));padding:2px var(--s4)}
