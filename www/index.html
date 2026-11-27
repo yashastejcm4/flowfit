@@ -783,6 +783,14 @@ i.d.ok{background:var(--accent)} i.d.warn{background:var(--c-yellow)} i.d.next{b
 .exr .more{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--muted);flex:none}
 .sheet .li .mi{width:36px;height:36px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center;flex:none;color:var(--fg)}
 .sheet .li:disabled{opacity:.35}
+.srch{position:relative}
+.srch svg.i{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.srch .field{padding-left:44px}
+.exsug{margin-top:var(--s2)}
+.exsug .li{min-height:56px;padding:8px 0}
+.exsug .ex-ic.sm{width:40px;height:40px;border-radius:10px}
+.ex-ic.thumb{background:var(--surface-2)}
+.ex-ic.thumb img{background:#fff}
 #splash{background:#0a0a0a}
 .grp .chip:not([aria-pressed="true"]),.sheet .chip:not([aria-pressed="true"]),.card .chip:not([aria-pressed="true"]){background:var(--surface-2)}
 .sheet .grp.flat .seg,.sheet .grp.flat .mini-step{background:var(--surface-3)}
@@ -1337,7 +1345,8 @@ const MEDIA_SRC={fedb:['https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@mai
 const MSYN={db:'dumbbell',dumbbells:'dumbbell',bb:'barbell',flyes:'fly',flye:'fly',flys:'fly',flies:'fly',ohp:'overhead',pushdowns:'pushdown',pec:'chest',rdl:'romanian'};
 const MSTOP=new Set(['the','a','with','on','of','and','to','for','grip','medium','version']);
 const MODD=new Set(['ball','bosu','band','scapular','upright','kettlebell','alternating','kneeling','deficit','partner','suspended','rope']);
-const MALIAS={'pec deck':'Butterfly','pull up':'Pullups','pullup':'Pullups','chin up':'Chin-Up','leg curl':'Lying Leg Curls','lying leg curl':'Lying Leg Curls','seated leg curl':'Seated Leg Curl','barbell row':'Bent Over Barbell Row','bent over row':'Bent Over Barbell Row','lateral raise':'Side Lateral Raise','dumbbell lateral raise':'Side Lateral Raise','deadlift':'Barbell Deadlift','push up':'Pushups','pushup':'Pushups','dip':'Dips - Triceps Version','dips':'Dips - Triceps Version','leg extension':'Leg Extensions','hip thrust':'Barbell Hip Thrust','plank':'Plank','squat':'Barbell Squat','bench press':'Barbell Bench Press - Medium Grip','overhead press':'Barbell Shoulder Press','military press':'Standing Military Press','tricep pushdown':'Triceps Pushdown','skull crusher':'EZ-Bar Skullcrusher','calf raise':'Standing Calf Raises','lunge':'Dumbbell Lunges','cable fly':'Cable Crossover','chest fly':'Dumbbell Flyes','dumbbell fly':'Dumbbell Flyes','rear delt fly':'Reverse Flyes','hammer curl':'Hammer Curls','preacher curl':'Preacher Curl','t bar row':'T-Bar Row with Handle','chest press machine':'Machine Bench Press','shoulder press machine':'Machine Shoulder (Military) Press'};
+const MATCH_V=2;
+const MALIAS={'pec deck':'Butterfly','pec fly':'Butterfly','machine fly':'Butterfly','lat pulldown':'Wide-Grip Lat Pulldown','pulldown':'Wide-Grip Lat Pulldown','seated cable row':'Seated Cable Rows','cable row':'Seated Cable Rows','leg press':'Leg Press','romanian deadlift':'Romanian Deadlift','rdl':'Romanian Deadlift','incline dumbbell press':'Incline Dumbbell Press','incline chest press':'Leverage Incline Chest Press','incline press machine':'Leverage Incline Chest Press','incline chest press machine':'Leverage Incline Chest Press','machine chest press':'Leverage Chest Press','rope pushdown':'Triceps Pushdown - Rope Attachment','triceps rope pushdown':'Triceps Pushdown - Rope Attachment','overhead triceps extension':'Cable Rope Overhead Triceps Extension','cable crunch':'Cable Crunch','ez bar curl':'EZ-Bar Curl','dumbbell curl':'Dumbbell Bicep Curl','bicep curl':'Dumbbell Bicep Curl','seated shoulder press':'Machine Shoulder (Military) Press','shoulder press':'Dumbbell Shoulder Press','face pull':'Face Pull','shrug':'Dumbbell Shrug','seated dip':'Dip Machine','dip machine':'Dip Machine','hack squat':'Hack Squat','goblet squat':'Goblet Squat','smith machine squat':'Smith Machine Squat','calf raise machine':'Standing Calf Raises','seated calf raise':'Seated Calf Raise','hip abduction':'Thigh Abductor','hip adduction':'Thigh Adductor','pull up':'Pullups','pullup':'Pullups','chin up':'Chin-Up','leg curl':'Lying Leg Curls','lying leg curl':'Lying Leg Curls','seated leg curl':'Seated Leg Curl','barbell row':'Bent Over Barbell Row','bent over row':'Bent Over Barbell Row','lateral raise':'Side Lateral Raise','dumbbell lateral raise':'Side Lateral Raise','deadlift':'Barbell Deadlift','push up':'Pushups','pushup':'Pushups','dip':'Dips - Triceps Version','dips':'Dips - Triceps Version','leg extension':'Leg Extensions','hip thrust':'Barbell Hip Thrust','plank':'Plank','squat':'Barbell Squat','bench press':'Barbell Bench Press - Medium Grip','overhead press':'Barbell Shoulder Press','military press':'Standing Military Press','tricep pushdown':'Triceps Pushdown','skull crusher':'EZ-Bar Skullcrusher','calf raise':'Standing Calf Raises','lunge':'Dumbbell Lunges','cable fly':'Cable Crossover','chest fly':'Dumbbell Flyes','dumbbell fly':'Dumbbell Flyes','rear delt fly':'Reverse Flyes','hammer curl':'Hammer Curls','preacher curl':'Preacher Curl','t bar row':'T-Bar Row with Handle','chest press machine':'Machine Bench Press','shoulder press machine':'Machine Shoulder (Military) Press'};
 const mtok=s=>String(s).toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w&&!MSTOP.has(w)).map(w=>MSYN[w]||w).map(w=>w.length>3&&w.endsWith('s')&&!w.endsWith('ss')?w.slice(0,-1):w);
 function mscore(q,c){const A=new Set(mtok(q)),B=new Set(mtok(c));let i=0;A.forEach(w=>{if(B.has(w))i++});if(!i)return 0;const extra=[...B].filter(w=>!A.has(w));return i/(A.size+0.35*extra.length+0.6*extra.filter(w=>MODD.has(w)).length)}
 const mkey=n=>String(n||'').toLowerCase().trim();
@@ -1346,8 +1355,8 @@ async function fetchT(url,ms,opt){const c=new AbortController(),t=setTimeout(()=
 let FEDB=null, fedbP=null;
 function loadFedb(){
   if(FEDB) return Promise.resolve(FEDB); if(fedbP) return fedbP;
-  fedbP=(async()=>{for(const base of MEDIA_SRC.fedb){try{const r=await fetchT(base+'dist/exercises.json',15000);if(!r.ok)continue;const j=await r.json();
-      if(Array.isArray(j)&&j.length){FEDB={base,list:j,byId:Object.fromEntries(j.map(x=>[x.id,x]))};return FEDB}}catch(e){}}
+  fedbP=(async()=>{for(const src of ['data/exercises.json',...MEDIA_SRC.fedb.map(b=>b+'dist/exercises.json')]){try{const r=await fetchT(src,15000);if(!r.ok)continue;const j=await r.json();
+      if(Array.isArray(j)&&j.length){FEDB={base:MEDIA_SRC.fedb[0],list:j,byId:Object.fromEntries(j.map(x=>[x.id,x]))};return FEDB}}catch(e){}}
     fedbP=null;throw new Error('unreachable')})();
   return fedbP;
 }
@@ -1355,18 +1364,35 @@ const guidesOn=()=>S.settings.guides!==false;
 function M(){if(!S.media)S.media={};return S.media}
 function autoMatch(name){
   if(!FEDB) return null;
-  const a=MALIAS[mnorm(name)]||MALIAS[mkey(name)]; if(a){const x=FEDB.list.find(e=>e.name===a);if(x)return x}
+  const key=aliasFor(name);
+  if(key){const x=FEDB.list.find(e=>e.name===key)||FEDB.list.find(e=>mkey(e.name)===mkey(key));if(x)return x}
   let best=null,bs=0; for(const x of FEDB.list){const sc=mscore(name,x.name);if(sc>bs){bs=sc;best=x}}
   return bs>=0.34?best:null;
 }
 function mediaFor(name){const m=M()[mkey(name)];if(!m||!FEDB)return null;const x=m.fid&&FEDB.byId[m.fid];return x?{m,x}:null}
 const imgSrc=p=>FEDB.base+'exercises/'+p;
+document.addEventListener('error',e=>{const t=e.target;if(!(t instanceof HTMLImageElement)||!t.classList.contains('xm'))return;const [a,b]=MEDIA_SRC.fedb;
+  if(t.src.startsWith(a)){t.src=b+t.src.slice(a.length);return}const w=t.closest('.thumb');if(w){w.classList.add('nopic');if(!w.querySelector('svg'))w.insertAdjacentHTML('beforeend',I('dumbbell',20))}},true);
 let fedbFail=0;
+/* known gym names → the library's name; also found inside longer names ("Pec Deck Fly" → Butterfly) */
+function aliasFor(name){const raw=' '+String(name||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()+' ', nm=mnorm(name);
+  return MALIAS[nm]||MALIAS[raw.trim()]||Object.keys(MALIAS).sort((a,b)=>b.length-a.length).map(k=>raw.includes(' '+k+' ')||(' '+nm+' ').includes(' '+k+' ')?MALIAS[k]:null).find(Boolean)||null}
+/* exercise search for the add/edit sheet: your own exercises first, then the library, best matches on top */
+const FMUS={chest:'Chest',lats:'Back','middle back':'Back','lower back':'Back',traps:'Back',neck:'Back',shoulders:'Shoulders',biceps:'Biceps',forearms:'Biceps',triceps:'Triceps',quadriceps:'Legs',hamstrings:'Legs',glutes:'Legs',calves:'Legs',adductors:'Legs',abductors:'Legs',abdominals:'Core'};
+function exSugHTML(q){
+  q=(q||'').trim(); const own=exerciseNames(), seen=new Set(), out=[];
+  const ownMus=n=>{for(const d of S.plan)for(const e of d.exercises)if(mkey(e.name)===mkey(n))return e.muscle;return null};
+  const ownHits=q?own.map(n=>[mscore(q,n)+(mkey(n).startsWith(mkey(q))?1:0),n]).filter(a=>a[0]>0).sort((a,b)=>b[0]-a[0]).slice(0,4).map(a=>a[1]):own.slice(0,4);
+  ownHits.forEach(n=>{seen.add(mkey(n));out.push({n,m:ownMus(n),own:true,x:mediaFor(n)&&mediaFor(n).x})});
+  if(FEDB&&q.length>=2){const al=aliasFor(q),ax=al&&FEDB.list.find(x=>x.name===al);if(ax&&!seen.has(mkey(ax.name))){seen.add(mkey(ax.name));out.push({n:ax.name,m:FMUS[(ax.primaryMuscles||[])[0]]||'Other',x:ax})}const qq=mkey(q);FEDB.list.filter(x=>x.category==='strength'||x.category==='powerlifting').map(x=>[mscore(q,x.name)+(mkey(x.name).includes(qq)?0.8:0),x]).filter(a=>a[0]>0.15&&!seen.has(mkey(a[1].name))).sort((a,b)=>b[0]-a[0]).slice(0,8-out.length).forEach(([,x])=>out.push({n:x.name,m:FMUS[(x.primaryMuscles||[])[0]]||'Other',x}))}
+  if(!out.length) return q?`<p class="faint sm" style="margin:8px 4px 0">${FEDB?'No match in the library. Keep your own name, it works the same.':'Loading the exercise library…'}</p>`:'';
+  return `<div class="grp flat">${out.map(o=>`<button class="li tap" data-a="pickExName" data-n="${esc(o.n)}" data-m="${esc(o.m||'')}"><span class="ex-ic thumb sm ${o.x&&o.x.images&&o.x.images[0]?'':'nopic'}">${o.x&&o.x.images&&o.x.images[0]?`<img class="xm" src="${esc(imgSrc(o.x.images[0]))}" alt="" loading="lazy">`:I('dumbbell',18)}</span><div class="lt"><b>${esc(o.n)}</b><span>${esc(o.m||'')}${o.own?' · in your plan':o.x&&o.x.equipment?' · '+esc(o.x.equipment):''}</span></div></button>`).join('')}</div>`;
+}
 async function ensureMatches(names){
-  if(!guidesOn()||!online()||Date.now()-fedbFail<60000) return;
+  if(!guidesOn()||Date.now()-fedbFail<60000) return;
   const had=!!FEDB;
   try{await loadFedb()}catch(e){fedbFail=Date.now();return}
-  let ch=!had; names.forEach(n=>{const k=mkey(n);if(M()[k])return;const x=autoMatch(n);M()[k]={fid:x?x.id:null,auto:true};ch=true});
+  let ch=!had; names.forEach(n=>{const k=mkey(n),m=M()[k];if(m&&!(m.auto&&m.v!==MATCH_V))return;const x=autoMatch(n);M()[k]={fid:x?x.id:null,auto:true,v:MATCH_V};ch=true});
   if(ch) rerender();
 }
 async function edbLookup(name,label){
@@ -2458,7 +2484,7 @@ const SHEETS={
     const isNew=ui.editEx==null, d=S.plan[ui.planDay];
     const e=isNew?{name:'',muscle:'Chest',sets:3,reps:10,rest:S.settings.rest}:d.exercises[ui.editEx];
     return sheetHead(`Day ${ui.planDay+1} · ${esc(d.name)}`,isNew?'Add exercise':'Edit exercise')+`<div class="sheet-body">
-     <div><label class="flabel" for="exName">Exercise name</label><input id="exName" class="field" value="${esc(e.name)}" list="exList" autocomplete="off" placeholder="e.g. Bench Press"><datalist id="exList">${exerciseNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>
+     <div><label class="flabel" for="exName">Exercise name</label><div class="srch">${I('search',18)}<input id="exName" class="field" value="${esc(e.name)}" autocomplete="off" autocapitalize="words" placeholder="Search 870+ exercises, or type your own"></div><div id="exSug" class="exsug">${isNew?exSugHTML(''):''}</div></div>
      <div><label class="flabel" for="exMuscle">Muscle group</label><select id="exMuscle" class="field">${MUSCLES.map(m=>`<option ${m===e.muscle?'selected':''}>${m}</option>`).join('')}</select></div>
      <div class="form-grid"><div><label class="flabel" for="exSets">Sets</label><input id="exSets" class="field tn" inputmode="numeric" pattern="[0-9]*" data-num="int" value="${e.sets}"></div><div><label class="flabel" for="exReps">Reps</label><input id="exReps" class="field tn" inputmode="tel" value="${repsTxt(e)}"></div><div><label class="flabel" for="exRest">Rest (s)</label><input id="exRest" class="field tn" inputmode="numeric" pattern="[0-9]*" data-num="int" value="${e.rest||S.settings.rest}"></div></div>
      <div><label class="flabel" for="exInc">Weight jump (${U()})</label><input id="exInc" class="field tn" inputmode="decimal" data-num="dec" value="${e.name?stepFor(e.name):''}" placeholder="${U()==='lb'?'5':'2.5'} for dumbbells, 5 or 7 for many machines"><div class="faint" style="font-size:12px;margin-top:6px">The smallest step this machine or rack goes up by.</div></div>
@@ -2845,7 +2871,7 @@ let lastView=null;
 const LIVE_SHEETS=['planset','coachset','dataset','lift','report','muscle'];
 function render(){
   sync(); applyTheme();
-  if(guidesOn()&&!render.mq){render.mq=true;setTimeout(()=>{render.mq=false;const names=[...new Set([...(S.active?S.active.exercises.map(e=>e.name):[]),...S.plan.flatMap(d=>d.exercises.map(e=>e.name))])].filter(n=>!FEDB||!M()[mkey(n)]);if(names.length)ensureMatches(names)},400)}
+  if(guidesOn()&&!render.mq){render.mq=true;setTimeout(()=>{render.mq=false;const names=[...new Set([...(S.active?S.active.exercises.map(e=>e.name):[]),...S.plan.flatMap(d=>d.exercises.map(e=>e.name))])].filter(n=>{const m=M()[mkey(n)];return !FEDB||!m||(m.auto&&m.v!==MATCH_V)});if(names.length)ensureMatches(names)},400)}
   const V={workout:viewWorkout,plan:viewPlan,progress:viewProgress,profile:viewProfile};
   const main=$('#main'), html=V[ui.view]();
   if(lastView!==ui.view){
@@ -2998,6 +3024,7 @@ const act={
   shOff(){try{localStorage.removeItem(SHK)}catch(e){}S.sync={};ui.syncErr=null;closeSheet();render();toast('Disconnected from Google Sheets')},
   updInstall(){const u=updInfo();if(!u||!u.url)return;buzz(15);toast('Downloading. Open the file when it finishes, then tap Install');setTimeout(()=>{if(isNative())location.href=u.url;else window.open(u.url,'_blank')},400)},
   openLog(){openSheet('coachlog')},
+  pickExName(d){const i=$('#exName'),m=$('#exMuscle');if(i)i.value=d.n;if(m&&d.m)m.value=d.m;const b=$('#exSug');if(b)b.innerHTML='';buzz(8);const s=$('#exSets');if(s)s.focus()},
   exMenu(d){ui.exMenu=+d.i;buzz(6);openSheet('exmenu')},
   exDo(d){const k=d.k;if(k==='editEx'){act.editEx({i:d.i});return}closeSheet();setTimeout(()=>act[k]({i:d.i,d:d.d}),180)},
   openPlanSet(){openSheet('planset')},
@@ -3254,6 +3281,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.tagName==='INPUT'&&e.target.closest('.sheet')){const b=$('#sheetRoot .btn-primary');if(b&&!b.disabled){e.preventDefault();b.click()}}
 });
 document.addEventListener('input',e=>{
+  if(e.target.id==='exName'){const b=$('#exSug');if(b)b.innerHTML=exSugHTML(e.target.value);if(!FEDB)loadFedb().then(()=>{const b2=$('#exSug'),i=$('#exName');if(b2&&i)b2.innerHTML=exSugHTML(i.value)}).catch(()=>{})}
   if(e.target.id==='impText'){ui.importText=e.target.value;const b=$('#parseBtn');if(b)b.disabled=!ui.importText.trim()}
   if(e.target.id==='mediaQ'&&FEDB){ui.mediaQ=e.target.value;const q=ui.mediaQ.trim()||ui.mediaFor;const res=FEDB.list.map(x=>[mscore(q,x.name),x]).filter(a=>a[0]>0).sort((a,b)=>b[0]-a[0]).slice(0,20).map(a=>a[1]);$('#mlist').innerHTML=mlistHTML(res)}
 });
