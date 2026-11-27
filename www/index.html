@@ -396,17 +396,11 @@ textarea.field{height:auto;min-height:250px;padding:16px;line-height:1.6;resize:
 #splash{position:fixed;inset:0;z-index:100;background:#0e0e0e;display:grid;place-items:center;pointer-events:none;transition:opacity .35s var(--ease)} /* same look as Android's launch screen, so the hand-off is invisible */
 #splash.out{opacity:0}
 /* progress v3 */
-.bodymap{width:100%;max-width:360px;height:auto;display:block;margin:0 auto}
-.bm{stroke:var(--surface);stroke-width:1.2;stroke-linejoin:round;transition:fill .3s}
-.bm-base,.bm-h0{fill:var(--surface-3)}
-.bm-h1{fill:rgba(190,242,100,.35)}.bm-h2{fill:rgba(190,242,100,.68)}.bm-h3{fill:#bef264}
+.bodymap{width:100%;height:auto;display:block;margin:0 auto}
 path[data-a]{cursor:pointer}
-.bm-sel{stroke:var(--fg);stroke-width:1.8}
-.bm-t{fill:var(--faint);font-size:9px;font-family:var(--font)}
 .legend{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
-.legend i.bm-h0{background:var(--surface-3)}.legend i.bm-h1{background:rgba(190,242,100,.35)}.legend i.bm-h2{background:rgba(190,242,100,.68)}.legend i.bm-h3{background:#bef264}
 .mapinfo{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45;box-shadow:inset 0 1px 0 var(--hi)}
 .mapinfo .faint{font-size:12px}
 .rep-h{font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.25}
@@ -698,8 +692,47 @@ h1,h2,h3{letter-spacing:-.02em}
 .card.coach-cta .coach-ic{background:rgba(15,15,15,.1)!important;color:var(--accent-ink)}
 .card.coach-cta .btn-primary{background:#0f0f0f!important;color:#f5f5f5}
 /* lime fills for charts and body map follow the new lime */
-.bm-h1{fill:rgba(220,242,91,.32)}.bm-h2{fill:rgba(220,242,91,.65)}.bm-h3{fill:#dcf25b}
-.legend i.bm-h1{background:rgba(220,242,91,.32)}.legend i.bm-h2{background:rgba(220,242,91,.65)}.legend i.bm-h3{background:#dcf25b}
+/* body map: dark figure, muscles shaded from grey to lime; a soft gradient on each muscle gives it volume */
+:root,:root[data-theme="dark"]{--bm-body-a:#3a3a3a;--bm-body-b:#242424;--bm-m0a:#575757;--bm-m0b:#3c3c3c;--bm-m1a:#717c3c;--bm-m1b:#4c5427;--bm-m2a:#b4c84b;--bm-m2b:#7e8e2b;--bm-m3a:#effc94;--bm-m3b:#c6de3a;--bm-floor:rgba(0,0,0,.55);--bm-line:#121212}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bm-body-a:#dcdcd6;--bm-body-b:#c9c9c2;--bm-m0a:#efefea;--bm-m0b:#d9d9d2;--bm-m1a:#e4efb0;--bm-m1b:#ccdc80;--bm-m2a:#cfe55a;--bm-m2b:#a8c02e;--bm-m3a:#c4e02a;--bm-m3b:#93ad12;--bm-floor:rgba(60,60,40,.18);--bm-line:#f7f7f3}}
+:root[data-theme="light"]{--bm-body-a:#dcdcd6;--bm-body-b:#c9c9c2;--bm-m0a:#efefea;--bm-m0b:#d9d9d2;--bm-m1a:#e4efb0;--bm-m1b:#ccdc80;--bm-m2a:#cfe55a;--bm-m2b:#a8c02e;--bm-m3a:#c4e02a;--bm-m3b:#93ad12;--bm-floor:rgba(60,60,40,.18);--bm-line:#f7f7f3}
+.bodymap{max-width:380px}
+.bm{stroke:var(--bm-line);stroke-width:1.3;stroke-linejoin:round;transition:filter .2s}
+.bm-sel{stroke:var(--fg);stroke-width:2}
+.bm-t{fill:var(--muted);font-size:11px;font-weight:500;font-family:var(--font)}
+.legend i.bm-h0{background:linear-gradient(135deg,var(--bm-m0a),var(--bm-m0b))!important}.legend i.bm-h1{background:linear-gradient(135deg,var(--bm-m1a),var(--bm-m1b))!important}.legend i.bm-h2{background:linear-gradient(135deg,var(--bm-m2a),var(--bm-m2b))!important}.legend i.bm-h3{background:linear-gradient(135deg,var(--bm-m3a),var(--bm-m3b))!important}
+.focus-on{display:flex;flex-direction:column;gap:8px}
+.focus-on .k{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.focus-on .row{gap:6px;flex-wrap:wrap}
+.fchip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;background:var(--surface-2);font-size:13px;font-weight:500}
+.fchip b{font-weight:700;font-variant-numeric:tabular-nums}
+/* ===== Spacing system (the app's guideline: every gap comes from this scale) =====
+   4 · 8 · 12 · 16 · 24 · 32. Page sides 16. Between cards 12. Section title: 24 above, 12 below.
+   Inside a card or list: 16 all round. List rows: 14 top and bottom, 16 sides, dividers inset to the text.
+   Icons: 16 inline with small text, 20 in rows and buttons, 24 in the nav. Every tap target at least 44. */
+:root{--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s6:24px;--s8:32px}
+#app{padding-left:max(var(--s4),env(safe-area-inset-left,0px));padding-right:max(var(--s4),env(safe-area-inset-right,0px));padding-top:var(--s4)}
+#main{gap:var(--s3)}
+.sec{margin-top:var(--s3);min-height:28px}
+.card{padding:var(--s4);gap:var(--s3)}
+.grp{padding:var(--s1) var(--s4)}
+.grp.flat{padding:0 var(--s4)}
+.li{min-height:60px;padding:14px 0;gap:var(--s3)}
+.li.col{padding:var(--s4) 0;gap:var(--s3)}
+.li .lt{gap:2px}
+.li .lt b{font-size:15px;line-height:1.3}
+.li .lt span{font-size:13px;line-height:1.4}
+.li .lv{gap:var(--s1)}
+.stats3,.body4{gap:var(--s2)}
+.stat{padding:var(--s3)}
+.kv-grid{padding:var(--s3) var(--s4);gap:var(--s3)}
+.row{gap:var(--s2)}
+.mchips{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.mode-opts{gap:var(--s2)}
+.mode-opts button{min-height:76px;padding:var(--s3)}
+.sheet-body{gap:var(--s4)}
+.legend{gap:var(--s3)}
+html.native body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:40;pointer-events:none}
 #splash{background:#0a0a0a}
 .grp .chip:not([aria-pressed="true"]),.sheet .chip:not([aria-pressed="true"]),.card .chip:not([aria-pressed="true"]){background:var(--surface-2)}
 .sheet .grp.flat .seg,.sheet .grp.flat .mini-step{background:var(--surface-3)}
@@ -1080,6 +1113,7 @@ function weekCard(){
     info=`<div class="mapinfo"><b>${sel}</b><span>${done[sel]||0} of ${volTarget(sel)} sets this week · ${ds==null?'not trained yet':ds===0?'trained today':`last trained ${ds} day${ds>1?'s':''} ago`}</span>${c&&c.why?`<span class="faint">${esc(c.why)}${c.to!==c.from?` (${c.from} → ${c.to} sets a week)`:''}</span>`:''}</div>`}
   else info=`<div class="mapinfo"><span>${ph.key==='deload'?'Easy week: half the sets so your muscles recover and grow.':'Muscles grow from enough hard sets each week. Fill each bar by Sunday.'}</span><span class="faint">Tap a muscle to see why its target is set.</span></div>`;
   return `<section class="card"><div class="card-top"><h3>This week</h3><span class="sm muted">${esc(phaseLine(ph))}</span></div>${bodyMap(done,sel,lv)}
+   ${(()=>{const top=VGROUPS.filter(m=>done[m]).sort((x,y)=>done[y]-done[x]);return top.length?`<div class="focus-on"><span class="k">You focused on</span><div class="row">${top.map(m=>`<span class="fchip">${m} <b>${done[m]}</b><span class="muted">sets</span></span>`).join('')}</div></div>`:''})()}
    <div class="legend"><span><i class="bm-h0"></i>Not yet</span><span><i class="bm-h1"></i>Started</span><span><i class="bm-h2"></i>Over half</span><span><i class="bm-h3"></i>Target hit</span></div>
    ${rows?`<div class="wk-list">${rows}</div>`:''}${info}${tiredNote(ph)}</section>`;
 }
@@ -1595,49 +1629,59 @@ function spark(vals){
 function ringSvg(frac){const C=2*Math.PI*16;return `<svg class="mring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" class="bg"/><circle cx="20" cy="20" r="16" class="fg" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-clamp(frac,0,1))).toFixed(1)}"/></svg>`}
 
 /* body map: original stylised front/back figure, regions coloured by sets trained */
-const BODY={
+/* Anatomical body map: left half of each figure, mirrored. viewBox per figure 200 x 450. [group, path] */
+const SIL='M100 60C94 60 90 61 88 63C82 70 70 78 58 84C48 88 44 96 43 108C41 124 39 140 37 156C35 168 33 176 32 186C30 202 28 220 27 236C25 246 22 256 21 266C20 274 24 282 29 280C33 278 34 270 36 262C38 254 40 246 41 238C44 222 48 204 50 190C52 180 54 170 56 160C57 152 58 142 60 132C61 150 62 170 63 190C63 200 61 212 60 224C57 244 56 266 58 288C60 304 62 316 63 328C62 346 61 366 64 388C66 404 68 416 66 428C64 436 72 440 84 438C90 437 90 432 88 426C86 414 87 402 88 388C90 368 92 348 92 330C93 316 95 298 96 282C97 266 98 250 100 240Z';
+const MUS={
  front:[
-  ['base','M50 4a11 11 0 1 1 0 22a11 11 0 1 1 0-22Z'],
-  ['base','M44 26h12v7H44Z'],
-  ['Shoulders','M36 33c-8 0-14 4-16 12c-1 5 0 9 3 11c3-6 8-10 14-11Z'],
-  ['Shoulders','M64 33c8 0 14 4 16 12c1 5 0 9-3 11c-3-6-8-10-14-11Z'],
-  ['Chest','M38 35h11v24c-6 1-12 0-15-3c-2-3-2-8 0-13c1-5 2-8 4-8Z'],
-  ['Chest','M62 35H51v24c6 1 12 0 15-3c2-3 2-8 0-13c-1-5-2-8-4-8Z'],
-  ['Biceps','M21 58c3-3 7-3 10 0c2 6 2 14-1 20c-3 2-6 2-9 0c-3-6-3-14 0-20Z'],
-  ['Biceps','M79 58c-3-3-7-3-10 0c-2 6-2 14 1 20c3 2 6 2 9 0c3-6 3-14 0-20Z'],
-  ['base','M20 81c3-1 6-1 9 1c1 9-1 19-4 27c-3 1-5 0-7-1c-1-9-1-18 2-27Z'],
-  ['base','M80 81c-3-1-6-1-9 1c-1 9 1 19 4 27c3 1 5 0 7-1c1-9 1-18-2-27Z'],
-  ['Core','M42 62h16v38c-3 3-13 3-16 0Z'],
-  ['Core','M34 62c3 4 6 6 7 8v29c-3-1-6-4-7-7c-1-10-1-20 0-30Z'],
-  ['Core','M66 62c-3 4-6 6-7 8v29c3-1 6-4 7-7c1-10 1-20 0-30Z'],
-  ['Legs','M34 104c4-2 10-2 15 1c1 14 0 30-3 44c-4 2-8 2-11 0c-4-14-4-30-1-45Z'],
-  ['Legs','M66 104c-4-2-10-2-15 1c-1 14 0 30 3 44c4 2 8 2 11 0c4-14 4-30 1-45Z'],
-  ['Legs','M36 154c3-2 7-2 10 0c1 12 0 24-2 34c-2 1-4 1-6 0c-3-10-3-22-2-34Z'],
-  ['Legs','M64 154c-3-2-7-2-10 0c-1 12 0 24 2 34c2 1 4 1 6 0c3-10 3-22 2-34Z']],
+  ['Back','M88 64C82 70 72 77 62 82C72 82 82 80 90 76C92 72 91 67 88 64Z'],
+  ['Shoulders','M60 83C50 86 44 95 43 108C43 118 45 124 48 127C50 118 54 110 60 104C64 98 68 92 72 87C68 84 64 83 60 83Z'],
+  ['Chest','M98 88C90 86 80 86 72 89C64 96 60 106 60 118C62 126 68 130 76 131C84 132 92 130 98 126Z'],
+  ['Biceps','M49 124C45 134 43 146 43 158C43 166 46 172 50 172C54 170 56 162 57 152C58 142 57 132 55 124C53 120 51 120 49 124Z'],
+  ['base','M41 180C37 194 33 210 31 226C31 234 35 238 39 236C43 222 47 206 50 192C51 186 50 180 47 178C44 177 42 178 41 180Z'],
+  ['Core','M90 134C88 140 88 148 89 154C92 156 95 156 98 155L98 134C95 133 92 133 90 134Z'],
+  ['Core','M89 158C88 164 88 170 89 176C92 178 95 178 98 177L98 158C95 157 92 157 89 158Z'],
+  ['Core','M89 180C88 186 88 192 89 198C92 200 95 200 98 199L98 180C95 179 92 179 89 180Z'],
+  ['Core','M89 202C89 214 92 226 98 236L98 202C95 201 92 201 89 202Z'],
+  ['Core','M64 134C64 152 65 170 67 186C70 196 76 204 84 210C86 200 86 186 86 172C86 158 86 146 86 136C80 132 72 132 64 134Z'],
+  ['Legs','M62 228C58 246 58 266 61 286C63 300 66 312 69 320C72 316 73 304 73 290C73 270 70 248 66 232C65 229 63 227 62 228Z'],
+  ['Legs','M76 236C73 256 73 278 75 298C76 308 79 316 83 320C87 314 88 300 88 286C88 266 86 248 82 238C80 233 78 232 76 236Z'],
+  ['Legs','M91 288C87 296 86 308 87 318C89 324 93 324 95 318C96 310 95 298 93 290C92 287 91 287 91 288Z'],
+  ['Legs','M86 240C89 252 93 264 96 276C97 270 98 258 98 246C96 242 92 240 86 240Z'],
+  ['Legs','M64 342C61 358 62 376 66 394C69 396 72 392 73 384C74 370 74 356 72 346C70 340 66 338 64 342Z'],
+  ['Legs','M86 340C88 356 88 374 86 392C84 396 81 392 80 386C79 372 80 356 82 344C83 339 85 338 86 340Z']],
  back:[
-  ['base','M50 4a11 11 0 1 1 0 22a11 11 0 1 1 0-22Z'],
-  ['Back','M50 26l14 9c-4 4-9 8-14 16c-5-8-10-12-14-16Z'],
-  ['Shoulders','M36 33c-8 0-14 4-16 12c-1 5 0 9 3 11c3-6 8-10 14-11Z'],
-  ['Shoulders','M64 33c8 0 14 4 16 12c1 5 0 9-3 11c-3-6-8-10-14-11Z'],
-  ['Back','M37 39c5 4 9 9 12 15v26c-5-2-10-6-13-12c-2-9-2-20 1-29Z'],
-  ['Back','M63 39c-5 4-9 9-12 15v26c5-2 10-6 13-12c2-9 2-20-1-29Z'],
-  ['Triceps','M21 58c3-3 7-3 10 0c2 6 2 14-1 20c-3 2-6 2-9 0c-3-6-3-14 0-20Z'],
-  ['Triceps','M79 58c-3-3-7-3-10 0c-2 6-2 14 1 20c3 2 6 2 9 0c3-6 3-14 0-20Z'],
-  ['base','M20 81c3-1 6-1 9 1c1 9-1 19-4 27c-3 1-5 0-7-1c-1-9-1-18 2-27Z'],
-  ['base','M80 81c-3-1-6-1-9 1c-1 9 1 19 4 27c3 1 5 0 7-1c1-9 1-18-2-27Z'],
-  ['Back','M42 82h16v18H42Z'],
-  ['Legs','M34 101c5-3 11-3 15 0v15c-5 3-11 3-15 0c-1-5-1-10 0-15Z'],
-  ['Legs','M66 101c-5-3-11-3-15 0v15c5 3 11 3 15 0c1-5 1-10 0-15Z'],
-  ['Legs','M34 120c4 2 10 2 15 0c1 10 0 20-3 29c-4 2-8 2-11 0c-3-9-3-19-1-29Z'],
-  ['Legs','M66 120c-4 2-10 2-15 0c-1 10 0 20 3 29c4 2 8 2 11 0c3-9 3-19 1-29Z'],
-  ['Legs','M35 153c4-2 8-2 11 0c2 10 1 22-2 33c-2 1-4 1-6 0c-4-10-4-22-3-33Z'],
-  ['Legs','M65 153c-4-2-8-2-11 0c-2 10-1 22 2 33c2 1 4 1 6 0c4-10 4-22 3-33Z']]};
+  ['Back','M100 62C94 62 90 63 88 64C82 72 72 79 62 84C70 92 80 100 88 112C92 120 96 128 100 136Z'],
+  ['Shoulders','M60 84C50 87 44 96 43 109C43 118 45 124 48 127C51 117 56 108 63 100C66 96 68 92 66 88C64 86 62 84 60 84Z'],
+  ['Back','M67 96C72 104 80 112 90 118C92 112 88 104 82 99C78 96 72 94 67 96Z'],
+  ['Triceps','M47 126C43 136 42 148 43 160C44 168 47 173 51 172C55 168 57 158 57 148C57 138 55 130 52 126C50 123 48 123 47 126Z'],
+  ['base','M41 180C37 194 33 210 31 226C31 234 35 238 39 236C43 222 47 206 50 192C51 186 50 180 47 178C44 177 42 178 41 180Z'],
+  ['Back','M63 106C62 126 63 148 66 168C68 180 72 190 78 196C86 188 92 176 96 162C97 152 97 144 96 136C88 126 78 116 63 106Z'],
+  ['Back','M92 170C89 182 88 196 89 210C92 214 96 216 98 216L98 162C96 164 94 166 92 170Z'],
+  ['Legs','M98 220C88 216 74 218 64 228C60 240 62 254 70 262C80 268 92 266 98 258Z'],
+  ['Legs','M62 268C59 286 61 304 67 320C71 322 75 316 77 304C78 290 77 276 74 268C70 264 65 264 62 268Z'],
+  ['Legs','M80 268C79 284 80 302 85 318C89 322 92 316 93 306C95 292 95 278 94 270C90 264 84 264 80 268Z'],
+  ['Legs','M64 338C59 352 60 370 66 386C71 388 75 382 77 372C78 360 77 348 74 340C71 335 67 335 64 338Z'],
+  ['Legs','M82 338C80 352 81 370 86 384C90 386 92 378 92 368C93 356 92 346 89 340C87 335 84 335 82 338Z']]};
+function bodyFig(side,ox,fill){
+  const mir=`transform="translate(${ox+200} 0) scale(-1 1)"`, pos=`transform="translate(${ox} 0)"`;
+  const head=`<ellipse cx="${ox+100}" cy="34" rx="19" ry="24" fill="url(#bmBody)"/><path d="M${ox+90} 52h20v12h-20Z" fill="url(#bmBody)"/>`;
+  const sil=`<path d="${SIL}" ${pos} fill="url(#bmBody)"/><path d="${SIL}" ${mir} fill="url(#bmBody)"/>`;
+  const mus=MUS[side].map(([g,d])=>[pos,mir].map(t=>fill(g,d,t)).join('')).join('');
+  return head+sil+mus;
+}
 function heat(n){return !n?0:n<6?1:n<12?2:3}
+/* front and back figures side by side; each muscle is shaded by how much of its weekly target is done (0 none … 3 target hit) */
 function bodyMap(sets,sel,lvl){
-  const fig=(side,dx)=>BODY[side].map(([m,d])=>{const b=m==='base',h=b?0:lvl?lvl(m):heat(sets[m]||0);
-    return `<path d="${d}" transform="translate(${dx} 0)" class="bm ${b?'bm-base':'bm-h'+h} ${sel===m?'bm-sel':''}" ${b?'':`data-a="mapPick" data-m="${m}" role="button" aria-label="${m}: ${sets[m]||0} sets"`}/>`}).join('');
-  return `<svg class="bodymap" viewBox="0 0 220 196" role="img" aria-label="Muscles trained in the last 7 days">${fig('front',4)}${fig('back',116)}
-   <text x="54" y="195" text-anchor="middle" class="bm-t">Front</text><text x="166" y="195" text-anchor="middle" class="bm-t">Back</text></svg>`;
+  const fill=(g,d,t)=>{const b=g==='base',h=b?0:lvl?lvl(g):heat(sets[g]||0);
+    return `<path d="${d}" ${t} class="bm ${sel===g?'bm-sel':''}" fill="url(#bmM${h})"${b?'':` data-a="mapPick" data-m="${g}" role="button" aria-label="${g}: ${sets[g]||0} sets"`}/>`};
+  const st=(id,a,b)=>`<linearGradient id="${id}" x1="0" y1="0" x2=".6" y2="1"><stop offset="0" style="stop-color:var(${a})"/><stop offset="1" style="stop-color:var(${b})"/></linearGradient>`;
+  return `<svg class="bodymap" viewBox="0 0 420 470" role="img" aria-label="Muscles trained this week"><defs>
+   <linearGradient id="bmBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--bm-body-a)"/><stop offset="1" style="stop-color:var(--bm-body-b)"/></linearGradient>
+   ${st('bmM0','--bm-m0a','--bm-m0b')}${st('bmM1','--bm-m1a','--bm-m1b')}${st('bmM2','--bm-m2a','--bm-m2b')}${st('bmM3','--bm-m3a','--bm-m3b')}
+   <radialGradient id="bmFloor"><stop offset="0" style="stop-color:var(--bm-floor)"/><stop offset="1" stop-opacity="0" style="stop-color:var(--bm-floor)"/></radialGradient></defs>
+   <ellipse cx="100" cy="444" rx="58" ry="7" fill="url(#bmFloor)"/><ellipse cx="320" cy="444" rx="58" ry="7" fill="url(#bmFloor)"/>
+   ${bodyFig('front',0,fill)}${bodyFig('back',220,fill)}
+   <text x="100" y="466" text-anchor="middle" class="bm-t">Front</text><text x="320" y="466" text-anchor="middle" class="bm-t">Back</text></svg>`;
 }
 /* ---------- views: progress (plain language) ---------- */
 const PLAIN={progressing:'Getting stronger',stalled:'Stuck',dropping:'Slipping',new:'Just started'};
@@ -2727,7 +2771,10 @@ function morphChildren(from,to){
   kids.forEach(n=>{if(!used.has(n)&&!isRip(n)&&n.parentNode===from)try{n.remove()}catch(e){}});
 }
 function patch(el,html){const t=el.cloneNode(false);t.innerHTML=html;morphChildren(el,t)}
-function applyTheme(){const t=S.settings.theme;if(t==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t)}
+function applyTheme(){const t=S.settings.theme;if(t==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t);statusBar()}
+/* keep the phone's status bar solid and out of the way, in the app's own colour, so content never scrolls under the clock */
+function statusBar(){try{const SB=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.StatusBar;if(!SB||!isNative())return;const t=S.settings.theme,dark=t==='dark'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);const c=dark?'#0a0a0a':'#f4f4f1';
+  if(statusBar.c===c)return;statusBar.c=c;SB.setOverlaysWebView({overlay:false}).catch(()=>{});SB.setBackgroundColor({color:c}).catch(()=>{});SB.setStyle({style:dark?'DARK':'LIGHT'}).catch(()=>{});const m=document.querySelector('meta[name=theme-color]');if(m)m.content=c}catch(e){}}
 const TABS=[['workout','home','Home'],['plan','plan','Plan'],['progress','chart','Progress'],['profile','user','Profile']];
 function buildNav(){$('#nav').innerHTML=`<div class="navbar">${TABS.map(([v,ic,l])=>`<button class="tap" data-a="nav" data-v="${v}" aria-label="${l}">${I(ic,22)}<span>${l}</span></button>`).join('')}</div>`}
 function updateNav(){document.querySelectorAll('.navbar button').forEach(b=>{if(b.dataset.v===ui.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')})}
