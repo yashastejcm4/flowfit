@@ -716,7 +716,7 @@ function defaultState(){
 let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||S.v!==1){S=defaultState();window.__fresh=true}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{window.__onSave&&window.__onSave()}catch(e){}try{if(typeof syncSoon==='function'&&!(S.active&&S.active.started))syncSoon()}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{window.__onSave&&window.__onSave()}catch(e){}try{if(typeof syncSoon==='function')syncSoon(S.active&&S.active.started?15000:4000)}catch(e){}};
 
 const VIEWS=['workout','plan','progress','profile'];
 const ui={view:VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):'workout',sel:todayISO(),dockOpen:false,curSet:{},planDay:0,progEx:null,progSearch:false,query:'',finish:null,restEnd:0,restTotal:0,imp:'menu',importText:'',parsed:null,impErr:'',sheet:null,calMonth:null,confirm:null,editEx:null,resetArm:false,today:todayISO(),ptab:'overview',range:'3m',busy:{},cerr:{},showKey:false,keyStatus:null,chatCtl:null};
@@ -1026,7 +1026,8 @@ function adjustNext(e,j){
   const want=s.rir==null?2:s.rir, felt=s.feel?FEEL_RIR[s.feel]-want:null, k=s.strain;
   let dir=null, why='';
   if(k!=null&&k>=80&&s.r<=goal){dir='down';why=`That looked like a real struggle (${s.r} reps)`}
-  else if(k!=null&&k<=15&&s.r>=goal&&rd!=='tired'&&ph!=='deload'){dir='up';why='That looked easy'}
+  else if(k!=null&&k<=25&&s.r>=goal&&rd!=='tired'&&ph!=='deload'){dir='up';why='That looked easy'}
+  else if(s.feel==='easy'&&s.r>=goal&&rd!=='tired'&&ph!=='deload'){dir='up';why=`Easy at ${s.r} reps`}
   if(!dir){
   if(s.r<=goal-2||(felt!=null&&felt<=-1.5&&s.r<goal)){dir='down';why=s.feel==='hard'?`That felt hard and you got ${s.r} of ${goal} reps`:`You got ${s.r} of ${goal} reps`}
   else if(rd!=='tired'&&ph!=='deload'&&s.feel!=='hard'&&(s.r-goal>=(rd==='fresh'||late?1:2)||(felt!=null&&felt>=1.5&&s.r>=goal))){dir='up';why=s.r-goal>=1?`You beat the target by ${s.r-goal} rep${s.r-goal>1?'s':''}`:`That felt easy for a “${rirText(want)}” set`}
@@ -1039,7 +1040,7 @@ function adjustNext(e,j){
   let nw=dir==='up'?stepFrom(e.name,cur,1):customStep(e.name)?stepFrom(e.name,cur,-1):Math.floor(cur*0.95/st+1e-9)*st; if(dir==='down'&&nw>=cur)nw=stepFrom(e.name,cur,-1);
   /* a big machine step mid-workout: only go up if you'd still get a sensible number of reps */
   if(dir==='up'&&repsAt(cur,s.r,nw)<Math.max(5,(tg.lo||goal)-2)){
-    if(s.r>=goal+1){const nr=Math.min(s.r,(tg.hi||goal)+5);e.sug={w:s.w,r:nr,dir:'same',from:j,why:`${why}. The next step (+${st} ${U()}) is too big a jump mid-workout, so stay here and go for ${nr} reps`,src:'app',reps:true}}
+    if(s.r>=goal+1||s.feel==='easy'){const nr=Math.min(Math.max(s.r,s.feel==='easy'?s.r+2:s.r),(tg.hi||goal)+5);e.sug={w:s.w,r:nr,dir:'same',from:j,why:`${why}. The next step (+${st} ${U()}) is too big a jump mid-workout, so stay here and go for ${nr} reps`,src:'app',reps:true}}
     else delete e.sug;
     return}
   e.sug={w:fromDisp(nw),dir,from:j,why,src:'app'};
@@ -2111,6 +2112,8 @@ function runNextSet(e,j){
     const ok=planCheck(e.name,out.weight,out.reps,r1(toDisp(s.w)))&&Number.isInteger(out.effort)&&out.effort>=0&&out.effort<=5&&(out.effort>0||failureOK(e.name));
     const rest=Number.isInteger(out.rest)?clamp(out.rest,30,300):null;
     const setRest=()=>{if(rest){e.rest=rest;const end=t0+rest*1000;if(end>Date.now()&&ui.restEnd){ui.restTotal=rest*1000;ui.restEnd=end;if(S.active.win)S.active.win.plan=rest*1000}}};
+    if(out.decision==='done'&&remaining>0&&s.r>=Math.max(1,((e.tg&&e.tg.lo)||s.r0||s.r)-1)&&!(s.read&&(s.read.pain||(s.read.drop||0)>=3))&&(s.strain==null||s.strain<85)){
+      markUsed('trainer','no: stopped the exercise too early (set was on target)');return}
     if(out.decision==='done'){
       e.coachDone=true; markUsed('trainer','yes: stopped this exercise');
       const cut=e.sets.map((x,k)=>k>j&&!x.done&&!x.edited?k:-1).filter(k=>k>=0);
@@ -2657,7 +2660,7 @@ function morphChildren(from,to){
     if(f!==ref)from.insertBefore(f,ref);
     prev=f;
   }
-  kids.forEach(n=>{if(!used.has(n)&&!isRip(n)&&n.parentNode===from)n.remove()});
+  kids.forEach(n=>{if(!used.has(n)&&!isRip(n)&&n.parentNode===from)try{n.remove()}catch(e){}});
 }
 function patch(el,html){const t=el.cloneNode(false);t.innerHTML=html;morphChildren(el,t)}
 function applyTheme(){const t=S.settings.theme;if(t==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t)}
@@ -2972,6 +2975,8 @@ function recordSignals(e,j){
   const ro=a.restOver, dur=ro&&now>ro?Math.round((now-ro)/1000):null;
   if(!first&&dur!=null&&dur<=300){s.sig.setSec=dur;s.sig.secPerRep=s.r>0?Math.round(dur/s.r*10)/10:null}
   s.sig.doneAt=hhmm(now); a.restOver=null;
+  const lt=a.lastTickAt; a.lastTickAt=now;
+  if(!first&&((lt&&now-lt<12000)||(s.sig.restTakenSec||0)>900)){s.sig.batch=lt&&now-lt<12000?'together':'late';['restTakenSec','restOverrunSec','setSec','secPerRep','offAppSec'].forEach(k=>delete s.sig[k])}
   a.win={from:now,off:0,taps:0,hiddenAt:document.visibilityState==='hidden'?now:null,plan:null};
   computeStrain(e,j);
 }
@@ -2993,14 +2998,17 @@ function computeStrain(e,j){
   try{readSet(e,j)}catch(err){ev('js-error','readSet: '+err.message)}
 }
 /* ---- reading a set: what the numbers say about why it went the way it did ---- */
+/* your normal rest across all exercises (median), so a long-for-you rest is judged against you, not the timer */
+function usualRest(){const v=[];S.sessions.slice(-12).forEach(x=>x.exercises.forEach(e=>e.sets.forEach(z=>{const t=z.sig&&z.sig.restTakenSec;if(t!=null&&t>20&&t<=900)v.push(t)})));if(v.length<8)return null;v.sort((a,b)=>a-b);return v[Math.floor(v.length/2)]}
 function paceFor(name,excl){const v=[];S.sessions.forEach(x=>x.exercises.forEach(e=>{if(e.name===name)e.sets.forEach(z=>{if(z.sig&&z.sig.secPerRep)v.push(z.sig.secPerRep)})}));
   const a=S.active;if(a)a.exercises.forEach(e=>{if(e.name===name)e.sets.forEach(z=>{if(z!==excl&&z.done&&z.sig&&z.sig.secPerRep)v.push(z.sig.secPerRep)})});
   if(v.length<3)return null;v.sort((x,y)=>x-y);return v[Math.floor(v.length/2)]}
 function readSet(e,j){
   const s=e.sets[j]; if(!s||!s.done||s.drop)return; const g=s.sig||{}, tags=[], R={};
-  const plan=g.restPlannedSec, took=g.restTakenSec, off=g.offAppSec||0;
+  const plan=g.restPlannedSec, took=g.restTakenSec, off=g.offAppSec||0, usual=usualRest();
+  if(g.batch){R.batch=true;tags.push(g.batch==='together'?'Ticked together with other sets, so rest and timing were not used':'Ticked long after the set, so rest and timing were not used')}
   if(took!=null&&plan){
-    if(took>plan*1.5&&took-plan>45){R.longRest=true;
+    if(took>Math.max(plan*1.5,usual?usual*1.5:0)&&took-plan>45){R.longRest=true;
       if(off>=took*0.6&&off>40){R.away=true;tags.push(`Rested ${took}s (planned ${plan}s), off the app for ${off}s: probably talking, on your phone or waiting for a machine`)}
       else if((g.inAppTaps||0)>=12){R.inApp=true;tags.push(`Rested ${took}s (planned ${plan}s) while using the app a lot`)}
       else tags.push(`Rested ${took}s (planned ${plan}s) with the app open: likely tired or waiting for a machine`)}
