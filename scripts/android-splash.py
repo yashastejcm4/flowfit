@@ -7,7 +7,7 @@ shutil.copy('assets/splash-icon.png', res / 'drawable-nodpi' / 'splash_icon.png'
 colors = res / 'values' / 'colors.xml'
 c = colors.read_text() if colors.exists() else '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n</resources>\n'
 if 'flowfit_bg' not in c:
-    c = c.replace('</resources>', '    <color name="flowfit_bg">#0E0E0E</color>\n</resources>')
+    c = c.replace('</resources>', '    <color name="flowfit_bg">#0A0A0A</color>\n</resources>')
 colors.write_text(c)
 styles = res / 'values' / 'styles.xml'
 s = styles.read_text()

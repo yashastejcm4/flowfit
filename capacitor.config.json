@@ -3,7 +3,7 @@
   "appName": "Flowfit",
   "webDir": "www",
   "android": {
-    "backgroundColor": "#0e0e0e",
+    "backgroundColor": "#0a0a0a",
     "allowMixedContent": false
   },
   "server": {
@@ -13,7 +13,7 @@
     "SplashScreen": {
       "launchShowDuration": 300,
       "launchAutoHide": true,
-      "backgroundColor": "#0e0e0e",
+      "backgroundColor": "#0a0a0a",
       "showSpinner": false
     },
     "LocalNotifications": {
