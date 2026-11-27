@@ -62,7 +62,8 @@ h1,h2,h3{margin:0;text-wrap:balance}
 
 /* press + ripple feedback */
 .tap{position:relative;overflow:hidden;transition:transform .35s var(--spring),background-color .25s var(--ease),color .2s,border-color .25s,opacity .2s;transform:translateZ(0)}
-.tap:active{transform:scale(.95);transition-duration:.08s}
+.tap:active{transform:scale(.97);transition-duration:.08s}
+button.li.tap:active{transform:none}
 .rip{position:absolute;border-radius:50%;background:currentColor;opacity:.22;pointer-events:none;transform:scale(0);animation:rip .55s var(--ease) forwards}
 @keyframes rip{to{transform:scale(1);opacity:0}}
 
@@ -85,7 +86,6 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .card{background:var(--surface);border-radius:var(--r-lg);padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0;border:1px solid var(--line)}
 .card-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .card-top h3{font-size:17px;font-weight:600}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .kv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;background:var(--surface-2);border-radius:var(--r-md);padding:14px 16px}
 .kv .k{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
 .kv .v{font-size:19px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
@@ -162,6 +162,23 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .dock-more>div{overflow:hidden;min-height:0}
 .dock-more .inner{display:flex;flex-direction:column;gap:12px;padding:14px 8px 6px 0}
 .stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat .v small{font-size:12px;font-weight:500;color:var(--muted)}
+/* settings lists: one look for every row (title + hint on the left, control or chevron on the right) */
+.grp{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:2px 18px;display:flex;flex-direction:column}
+.grp.flat{background:var(--surface-2);border:0;padding:0 16px;border-radius:var(--r-md)}
+.li{display:flex;align-items:center;gap:14px;min-height:60px;padding:12px 0;width:100%;text-align:left;color:inherit;background:none;border-radius:0}
+.li+.li{border-top:1px solid var(--line)}
+.li.col{flex-direction:column;align-items:stretch;gap:12px;padding:16px 0}
+.li .lt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.li .lt b{font-weight:600;font-size:15px}
+.li .lt span{font-size:12.5px;color:var(--muted);line-height:1.4}
+.li .lv{flex:none;display:flex;align-items:center;gap:4px;color:var(--muted);font-size:14px}
+.li .lv svg{opacity:.6}
+button.li.tap:active{background:transparent;opacity:.7}
+.body4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.body4 .k{font-size:12px;color:var(--muted)}
+.body4 .v{font-size:20px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.body4 .v small{font-size:12px;font-weight:500;color:var(--muted);margin-left:2px}
 .stat{background:var(--surface-2);border-radius:16px;padding:12px 14px;min-width:0}
 .stat .k{font-size:12px;color:var(--muted)}
 .stat .v{font-size:19px;font-weight:700;margin-top:4px;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -248,12 +265,6 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .cap .lb{font-size:11px;color:var(--faint);white-space:nowrap}
 .cap.on .lb{color:var(--accent-fg)}
 .cap .tip{left:50%;top:auto;bottom:100%;transform:translate(-50%,-8px)}
-.minibars{display:flex;align-items:flex-end;gap:3px;height:36px}
-.minibars i{flex:1;border-radius:3px;background:var(--surface-3);min-height:6px}
-.minibars i.on{background:var(--accent)}
-.segs{display:flex;gap:5px}
-.segs i{flex:1;height:6px;border-radius:6px;background:var(--surface-3)}
-.segs i.on{background:var(--accent)}
 .big{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 .big .v{font-size:40px;font-weight:800;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
 .big .u{font-size:17px;color:var(--muted);font-weight:500}
@@ -281,20 +292,12 @@ h1,h2,h3{margin:0;text-wrap:balance}
 .seg{display:inline-flex;background:var(--surface-2);border-radius:999px;padding:4px;gap:2px}
 .seg button{font-size:13px;font-weight:600;padding:9px 14px;border-radius:999px;color:var(--muted);text-transform:capitalize}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
-.set-line{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;min-height:50px}
-.set-card{gap:0}
-.set-card .sl-t{flex:1 1 120px}
-.set-card .set-line{padding:10px 0;border-top:1px solid var(--line)}
-.set-card .set-grp+.set-line{border-top:0}
-.set-grp{font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:16px 0 4px}
-.set-card .set-grp:first-child{padding-top:2px}
 .mode-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mode-opts button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:11px 12px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);text-align:left;min-height:84px}
 .mode-opts button b{font-size:14px;font-weight:600}
 .mode-opts button span{font-size:11.5px;line-height:1.35;color:var(--muted)}
 .mode-opts button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface-2))}
 .mode-opts button[aria-pressed="true"] b{color:var(--accent-fg)}
-.set-line>span{font-weight:500}
 .mini-step{display:inline-flex;align-items:center;gap:4px;background:var(--surface-2);border-radius:999px;padding:4px}
 .mini-step button{width:36px;height:36px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center}
 .mini-step .tn{min-width:52px;text-align:center;font-weight:700}
@@ -352,9 +355,9 @@ textarea.field{height:auto;min-height:250px;padding:16px;line-height:1.6;resize:
 @keyframes drop{from{transform:translateY(-30px) scale(.9);opacity:0}}
 
 /* page enter */
-.enter>*{animation:up .5s var(--ease) both;animation-delay:calc(var(--i,0)*45ms)}
-@keyframes up{from{opacity:0;transform:translateY(14px)}}
-.enter .cap .fill{animation:grow .8s var(--spring) both;animation-delay:calc(var(--i,0)*45ms + 150ms)}
+.enter{animation:fadeIn .22s var(--ease)} /* switching tabs: one quiet fade, no staggered slide-ins */
+@keyframes up{from{opacity:0;transform:translateY(4px)}}
+.enter .cap .fill{animation:grow .6s var(--ease) both;animation-delay:.1s}
 .enter .vol-track i,.enter .prog i{animation:growX .8s var(--ease) both;animation-delay:.2s}
 .enter .wave .ln{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.1s var(--ease) .2s forwards}
 .enter .wave .area,.enter .knob,.enter .tip{animation:fade .5s var(--ease) .8s both}
@@ -367,7 +370,7 @@ textarea.field{height:auto;min-height:250px;padding:16px;line-height:1.6;resize:
 :root[data-theme="light"]{--hi:rgba(255,255,255,.95);--lo:rgba(40,50,20,.09);--well:rgba(40,50,20,.1);--raise:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,0));--surf:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,0))}
 /* lime surfaces */
 .btn-primary,.day.sel,.navbar button[aria-current="page"],.chip[aria-pressed="true"],.chip[aria-selected="true"],.seg button[aria-pressed="true"],.set.done .check,.opt .ic,.month button.has,.avatar,.streak-pill,.cap.on .fill{background:var(--lime);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 0 rgba(60,90,0,.18)}
-.badge.solid,.vol-track i,.prog i,.minibars i.on,.segs i.on{background:var(--lime);box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+.badge.solid,.vol-track i,.prog i{background:var(--lime);box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
 .avatar{box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -2px 0 rgba(60,90,0,.18),0 0 0 4px var(--accent-soft)}
 .btn-primary:active{box-shadow:inset 0 2px 3px rgba(60,90,0,.28)}
 /* day strip: each day is a small raised pill */
@@ -392,11 +395,8 @@ textarea.field{height:auto;min-height:250px;padding:16px;line-height:1.6;resize:
 .brand-tile .logo{display:block}
 .brand-hero{display:flex;justify-content:center;align-items:center;padding:4px 0}
 .brand-hero.sm{justify-content:flex-start}
-#splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;pointer-events:none;transition:opacity .4s var(--ease)}
+#splash{position:fixed;inset:0;z-index:100;background:#0e0e0e;display:grid;place-items:center;pointer-events:none;transition:opacity .35s var(--ease)} /* same look as Android's launch screen, so the hand-off is invisible */
 #splash.out{opacity:0}
-#splash .sp-in{display:flex;flex-direction:column;align-items:center;gap:14px;animation:spIn .7s var(--spring) both}
-#splash .sp-name{font-weight:800;font-size:20px;letter-spacing:-.01em;color:var(--fg)}
-@keyframes spIn{from{opacity:0;transform:scale(.8) translateY(8px)}}
 /* progress v3 */
 .bodymap{width:100%;max-width:360px;height:auto;display:block;margin:0 auto}
 .bm{stroke:var(--surface);stroke-width:1.2;stroke-linejoin:round;transition:fill .3s}
@@ -505,7 +505,7 @@ a.btn{text-decoration:none}
 .optgrid.col{flex-direction:column}.optgrid.col .opt2{width:100%;padding:12px 16px}
 .plan-now{display:flex;flex-direction:column;gap:4px;background:var(--surface-2);border-radius:16px;padding:14px 16px;box-shadow:inset 0 1px 0 var(--hi)}
 .plan-now b{font-size:20px;font-weight:700}.plan-now span{font-size:14px;color:var(--muted);line-height:1.45}
-.sl-t{display:flex;flex-direction:column;gap:2px;flex:1 1 160px;min-width:0}.sl-t>span:first-child{font-weight:500}.sl-t .faint{font-size:12px;line-height:1.4}
+
 .opt2{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:44px;padding:10px 14px;border-radius:16px;background:var(--surface-2);text-align:left;box-shadow:inset 0 1px 0 var(--hi),0 1px 2px var(--lo)}
 .opt2 b{font-size:14px;font-weight:600}
 .opt2 span{font-size:12px;color:var(--muted)}
@@ -720,7 +720,7 @@ if(!S||S.v!==1){S=defaultState();window.__fresh=true}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{window.__onSave&&window.__onSave()}catch(e){}try{if(typeof syncSoon==='function')syncSoon(S.active&&S.active.started?15000:4000)}catch(e){}};
 
 const VIEWS=['workout','plan','progress','profile'];
-const ui={view:VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):'workout',sel:todayISO(),dockOpen:false,curSet:{},planDay:0,progEx:null,progSearch:false,query:'',finish:null,restEnd:0,restTotal:0,imp:'menu',importText:'',parsed:null,impErr:'',sheet:null,calMonth:null,confirm:null,editEx:null,resetArm:false,today:todayISO(),ptab:'overview',range:'3m',busy:{},cerr:{},showKey:false,keyStatus:null,chatCtl:null};
+const ui={view:VIEWS.includes(location.hash.slice(1))?location.hash.slice(1):'workout',sel:todayISO(),dockOpen:false,curSet:{},planDay:0,progEx:null,query:'',finish:null,restEnd:0,restTotal:0,imp:'menu',importText:'',parsed:null,impErr:'',sheet:null,calMonth:null,confirm:null,editEx:null,resetArm:false,today:todayISO(),ptab:'overview',range:'3m',busy:{},cerr:{},showKey:false,keyStatus:null,chatCtl:null};
 
 /* ---------- units ---------- */
 const LB=2.20462;
@@ -797,9 +797,7 @@ const sessVol=s=>s.exercises.reduce((a,e)=>a+e.sets.reduce((b,x)=>b+x.w*x.r,0),0
 const sessSets=s=>s.exercises.reduce((a,e)=>a+e.sets.length,0);
 /* drop sets (marked d / drop) are extra work: they never count as your weight for progression */
 const mainSets=sets=>sets.filter(x=>!x.d&&!x.drop);
-const DROP_RX=/raise|curl|fly|pec deck|pushdown|push-down|extension|kickback|shrug|face pull|crossover/i, COMPOUND_RX=/press|row|pulldown|pull-down|pull-?up|chin|dip|squat|deadlift|lunge|bench/i;
-/* any exercise can take a drop set: lower the weight and keep going right after a set */
-const dropOK=name=>true;
+const COMPOUND_RX=/press|row|pulldown|pull-down|pull-?up|chin|dip|squat|deadlift|lunge|bench/i;
 const e1rm=(w,r)=>w*(1+r/30);
 const curWeight=()=>{const w=[...S.profile.weights].sort((a,b)=>a.date<b.date?-1:1);return w.length?w[w.length-1].kg:null};
 
@@ -826,7 +824,6 @@ function lastDone(dayId){const s=sorted().reverse().find(x=>x.dayId===dayId);ret
 function roundStepKg(kg,mode,name){const st=name?stepFor(name):stepSize(),v=toDisp(kg)/st;const n=mode==='down'?Math.floor(v+1e-9):mode==='up'?Math.ceil(v-1e-9):Math.round(v);return fromDisp(Math.max(0,n*st))}
 /* today's target per exercise: double progression, computed on the phone */
 /* ---- program: muscle-building blocks (offline coach brain) ---- */
-const PH={block:{label:'Building'},deload:{label:'Easy week'},steady:{label:'Steady'}};
 function prog(){
   if(!S.program)S.program={mode:'block',len:5,failureFree:false,anchor:weekStart(todayISO())};
   const p=S.program; if(p.mode==='phased'){p.mode='block';p.len=5} if(!p.len)p.len=5; if(!p.anchor)p.anchor=weekStart(todayISO()); if(!p.priority)p.priority=[];
@@ -1291,7 +1288,7 @@ function exCard(e,i){
   if(!isOpen(e)||e.skipped){
     const md=mainSets(dn), top=md.length?md.reduce((a,b)=>b.w>a.w||(b.w===a.w&&b.r>a.r)?b:a):null, nd=dn.length-md.length;
     const sub=e.skipped?'Skipped':all&&top?`${md.length} sets · best ${fmtW(top.w)} ${U()} × ${top.r}${nd?` · ${nd} drop${nd>1?'s':''}`:''}`:`${e.later&&!all?'Later · ':''}${targetText(e)} · ${e.sets.length} sets`;
-    const dropLink=all&&!e.skipped&&dropOK(e.name)&&S.active.lastDone===e.id?`<button class="link tap" style="flex:none" data-a="addDrop" data-i="${i}">+ Drop</button>`:'';
+    const dropLink=all&&!e.skipped&&S.active.lastDone===e.id?`<button class="link tap" style="flex:none" data-a="addDrop" data-i="${i}">+ Drop</button>`:'';
     return `<section class="card exc ${all?'done':''} ${e.skipped?'skipped':''}" id="ex-${e.id}"><div class="exc-row">${mediaThumb(e.name,'sm')}
       <button class="exc-main tap" data-a="openEx" data-id="${e.id}" aria-expanded="false"><span class="exc-n">${esc(e.name)}</span><span class="exc-s tn">${all?`<span class="c-lime">${I('check',13)}</span> `:''}${esc(sub)}</span></button>
       ${e.skipped?`<button class="link tap" data-a="skip" data-i="${i}">Undo</button>`:dropLink||dots(e)}</div></section>`;
@@ -1377,7 +1374,6 @@ function feelBar(a){
     <div class="feel3">${[['easy','Easy'],['good','Good'],['hard','Hard']].map(([v,l])=>`<button class="tap ${s.feel===v?'on':''}" data-a="feel" data-i="${a.exercises.indexOf(e)}" data-j="${f.j}" data-v="${v}">${l}</button>`).join('')}</div>
     </div>`;
 }
-const changedSet=s=>!!(s&&s.sig&&((s.sig.userWeightChange||0)!==0||(s.sig.userRepChange||0)!==0));
 function trendCounts(a){const c={up:0,hold:0,down:0,new:0,coach:0,ai:0};a.exercises.filter(e=>!e.skipped&&e.tg).forEach(e=>c[e.tg.kind]++);return c}
 function trendChips(a){const c=trendCounts(a);const p=[];if(c.up)p.push(`<span class="tk up">↑ ${c.up} going up</span>`);if(c.ai)p.push(`<span class="tk up">★ ${c.ai} planned by Coach</span>`);if(c.coach)p.push(`<span class="tk up">★ ${c.coach} from Coach</span>`);if(c.hold)p.push(`<span class="tk">= ${c.hold} holding</span>`);if(c.down)p.push(`<span class="tk down">↓ ${c.down} lighter</span>`);if(c.new)p.push(`<span class="tk">• ${c.new} new</span>`);return p.length?`<div class="row wrap" style="gap:6px">${p.join('')}</div>`:''}
 const READY={fresh:['Fresh','Go for the top of your rep ranges'],normal:['Normal','Train as planned'],tired:['Tired','5% lighter, one less set on accessories']};
@@ -1470,13 +1466,6 @@ const last7=()=>{const t=todayISO(),f=addDays(t,-6);return S.sessions.filter(s=>
 const weekSessions=ws=>{const we=addDays(ws,6);return S.sessions.filter(s=>s.date>=ws&&s.date<=we)};
 function musclesSets(list){const m={};list.forEach(s=>s.exercises.forEach(e=>m[e.muscle]=(m[e.muscle]||0)+e.sets.length));return m}
 function balanceOf(m){const g=k=>k.reduce((a,x)=>a+(m[x]||0),0);return {push:g(PUSH),pull:g(PULL),legs:m.Legs||0,core:m.Core||0}}
-function balanceFlag(b){
-  const tot=b.push+b.pull+b.legs+b.core; if(tot<6) return null;
-  if(b.push>0&&b.pull<b.push*0.7) return `Pull is ${Math.round(b.pull/b.push*100)}% of push in the last 7 days`;
-  if(b.pull>0&&b.push<b.pull*0.7) return `Push is ${Math.round(b.push/b.pull*100)}% of pull in the last 7 days`;
-  if(b.legs<tot*0.2) return `Legs are ${Math.round(b.legs/tot*100)}% of your sets in the last 7 days`;
-  return null;
-}
 function daysSince(muscle){const s=sorted().reverse().find(x=>x.exercises.some(e=>e.muscle===muscle));return s?diffDays(s.date,todayISO()):null}
 function bodyTrend(){
   const w=[...S.profile.weights].sort((a,b)=>a.date<b.date?-1:1); if(!w.length) return null;
@@ -1515,7 +1504,6 @@ function spark(vals){
   const p=vals.map((v,i)=>[2+i*60/(vals.length-1),22-(v-mn)/(mx-mn)*18]);
   return `<svg class="spark" viewBox="0 0 64 26" aria-hidden="true"><path d="${smooth(p)}"/><circle cx="${p.at(-1)[0]}" cy="${p.at(-1)[1]}" r="2.6" fill="var(--accent)"/></svg>`;
 }
-const statusChip=st=>`<span class="status st-${st.key}">${st.label}</span>`;
 function ringSvg(frac){const C=2*Math.PI*16;return `<svg class="mring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" class="bg"/><circle cx="20" cy="20" r="16" class="fg" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-clamp(frac,0,1))).toFixed(1)}"/></svg>`}
 
 /* body map: original stylised front/back figure, regions coloured by sets trained */
@@ -1608,7 +1596,6 @@ function reportCard(){
 }
 function liftRow(n){const st=liftStatus(n),l=st.L.at(-1);return `<button class="lift-row tap ${ui.progEx===n?'sel':''}" data-a="progEx" data-n="${esc(n)}"><div style="min-width:0"><div class="t" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n)}</div><div class="sm muted tn" style="margin-top:3px">${l?`${fmtW(l.w)} ${U()} × ${l.r}`:'Not done yet'}</div></div>${spark(st.L.slice(-8).map(x=>x.e))}<span class="status st-${st.key}">${PLAIN[st.key]}</span></button>`}
 function strengthChips(){return ''}
-const chipsHTML=strengthChips;
 function pStrength(){
   const names=strengthNames().filter(n=>liftSessions(n).length);
   if(!names.length) return `<section class="card empty"><h3>Nothing to show yet</h3><p>Finish a workout and each lift will show here with whether it’s going up.</p></section>`;
@@ -1895,18 +1882,6 @@ function errLine(key){
 }
 const madeAt=ts=>{const d=new Date(ts);return `${WD[d.getDay()].slice(0,1)+WD[d.getDay()].slice(1).toLowerCase()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
 const offBtn=()=>online()?'':'disabled';
-function coachCard(){
-  const c=C(); if(!c.on) return '';
-  if(!getKey()) return c.hidePrompt?'':`<section class="card coach-cta"><div class="row"><span class="coach-ic">${I('coach',18)}</span><div class="grow"><b>Weekly coaching</b><div class="sm muted">Add your Groq or Claude key to get advice based on your data.</div></div><button class="link tap" data-a="coachSetup">Set up</button><button class="sq tap" style="width:36px;height:36px" data-a="coachHidePrompt" aria-label="Hide">${I('x',15)}</button></div></section>`;
-  const wk=weekStart(todayISO()), ci=c.checkin&&c.checkin.week===wk?c.checkin:null, busy=ui.busy.checkin, enough=S.sessions.length>=3;
-  let body;
-  if(busy) body=`<span class="sm muted">Reading your last 6 weeks…</span>${skel(3)}<div>${skel(2)}</div>`;
-  else if(ci) body=`${ci.summary?`<p class="coach-sum">${esc(ci.summary)}</p>`:''}${ci.actions.length?actCards(ci.actions,'checkin'):`<span class="sm muted">No changes needed this week. Keep going.</span>`}
-    <div class="row spread"><span class="meta">Based on your last 6 weeks · ${madeAt(ci.made)}</span>${(ci.refreshes||0)<3?`<button class="link tap" data-a="runCheckin" ${offBtn()}>Refresh</button>`:''}</div>`;
-  else body=`<span class="sm muted">${enough?'A short read on your week and up to 3 changes you can apply in one tap.':'Log 3 workouts to unlock check-ins.'}</span>
-    <button class="btn btn-primary btn-block tap" data-a="runCheckin" ${enough&&online()?'':'disabled'}>${online()?'Get this week’s check-in':'Offline'}</button>`;
-  return `<section class="card coach"><div class="coach-head"><span class="coach-ic">${I('coach',18)}</span><div class="grow"><b>Coach check-in</b><div class="sm muted">Week of ${fmtD(wk)}</div></div><button class="btn btn-ghost btn-sm tap" data-a="openChat">Ask Coach</button></div>${body}${errLine('checkin')}</section>`;
-}
 function fixBlock(name,st){
   if(!coachReady()||!['stalled','dropping'].includes(st.key)) return '';
   const key='fix:'+name, f=C().fixes[name], valid=f&&f.n===st.L.length;
@@ -1950,7 +1925,6 @@ function runRecap(sid){return runCoach('recap:'+sid,async()=>{
   s.recap=r;
 })}
 const planSig=()=>JSON.stringify(S.plan.map(d=>[d.id,d.exercises.map(e=>[e.name,e.sets,e.reps,e.repsHi])]));
-function targetsFor(){const a=S.active,t=C().targets;return a&&t&&t.date===todayISO()&&t.dayId===a.dayId&&t.sig===planSig()?t:null}
 function runTargets(){return runCoach('targets',async()=>{
   const a=S.active; if(!a) return;
   const names=a.exercises.filter(e=>!e.skipped).map(e=>e.name), data=coachData({lifts:names,limit:3,weeks:4});
@@ -2000,16 +1974,6 @@ function phaseCtx(){const ph=phaseNow(),p=prog();return {phase:ph.key==='block'?
   priorityMuscles:p.priority,weeklySets:Object.fromEntries(VGROUPS.map(m=>[m,{target:volTarget(m),doneThisWeek:doneThisWeek(m)}])),lastVolumeChanges:p.volLog&&p.volLog.changes||null,
   recovery:recovCtx(),nutrition:nutriCtx()}}
 function recovCtx(){const r=recov().filter(x=>diffDays(x.date,todayISO())<=7);if(!r.length)return null;const last=r.at(-1);return {lastCheck:last.date,sleep:last.sleep||null,energy:last.energy||null,jointPain:r.some(x=>x.joint),soreness:Object.fromEntries(r.filter(x=>x.m).map(x=>[x.m,x.sore]))}}
-const SETSYS=`
-The program is built for muscle growth: weekly sets per muscle (weeklySets) are the main driver; reps in reserve start at 3 in week 1 of a block and fall to ~1 by the last week, then an easy week. Sore muscles get fewer sets. Priority muscles come first and get more sets.
-Effort is "reps in reserve": 0 = failure, 1 = one more rep was possible, and so on. Feel after a set: easy ≈ 3+ in reserve, good ≈ 2, hard ≈ 0-1. Respect the phase guidance and the lifter's profile; only use 0 (failure) when failureAllowed is true. Never exceed one weight step up from the last set, never drop more than 10%.`;
-function setCheck(name,w,r,rir,ref){
-  const st=stepFor(name), pe=planEx(name)||{reps:r,repsHi:r}, lo=Math.max(1,pe.reps-3), hi=(pe.repsHi||pe.reps)+5;
-  if(typeof w!=='number'||!isFinite(w)||!Number.isInteger(r)||!Number.isInteger(rir)) return false;
-  if(r<lo||r>hi||rir<0||rir>5) return false;
-  if(rir===0&&!failureOK(name)) return false;
-  return w>=Math.min(ref*0.9,ref-st)-0.06&&w<=ref+st+0.06&&w>=0;
-}
 /* ---------- AI trainer: plans the session and decides every set ---------- */
 const TRAINER=`\nSignals per set (measured by the app): restTakenSec vs restPlannedSec, restOverrunSec (late start), offAppSec (seconds outside the app during that rest, usually on their phone), inAppTaps, userWeightChange (they changed the suggested weight themselves), strain 0-100 (app estimate: under 30 easy, 30-55 working, 55-78 hard, 78+ struggling), pctOfBest (this set vs their best ever on this lift). setSec and secPerRep: how long the set took and seconds per rep (compare with earlier sets: much slower means grinding). appReading: the app's own interpretation of the set (long rest while away from the app = probably talking or on the phone; feel vs numbers mismatch; pain). whyChanged: why the lifter changed the suggested weight. pain: true means never add weight to this exercise today. Before deciding, write "read": one or two plain sentences on WHY this set went the way it did, using these numbers (rest, time away, pace, reps vs target, feel). A long rest caused mostly by phone time is distraction, not fatigue: keep the plan and, if it keeps happening, gently ask them to keep rest on time. A long rest with little phone time, rising strain, or falling reps means real fatigue: hold or reduce. Session signals show how the whole workout is going.\nYou are standing next to the lifter as their personal trainer during this workout. Decide every set: weight, reps, reps in reserve ("effort", 0 = failure) and rest in seconds. Talk like a calm, experienced trainer: short, direct, encouraging, specific. Effort feel: easy ≈ 3+ reps left, good ≈ 2, hard ≈ 0-1. Respect the phase guidance, the lifter's profile, today's feeling and their chosen focus. Only use effort 0 when failureAllowed is true. Never more than one weight step up from the last set and never more than 15% down. For a first-time exercise pick a conservative starting weight from the profile and similar lifts, then adjust from how the set went.`;
 function sessionSignals(){
@@ -2173,104 +2137,113 @@ function scrollChat(){const m=$('#msgs');if(m)m.scrollTop=m.scrollHeight}
 const strengthNames=()=>{const m=mainLifts();return [...m,...exerciseNames().filter(n=>!m.some(x=>x.toLowerCase()===n.toLowerCase()))]};
 
 /* ---------- views: profile ---------- */
-function trainingCards(){
-  const t=S.profile.train, p=prog(), ph=phaseNow();
-  const L={exp:{new:'Under 6 months',mid:'6–24 months',adv:'2+ years'},goal:{muscle:'Build muscle',strength:'Get stronger',both:'Muscle and strength',cut:'Lose fat, keep strength',recomp:'Lean and fit'},effort:{easy:'Takes it easy',close:'Close to the limit',failure:'All-out often'},where:{gym:'Full gym',machines:'Mostly machines',home:'Home, dumbbells'}};
-  const sw=(a,on,label)=>`<button class="sw tap" role="switch" aria-checked="${on}" aria-label="${label}" data-a="${a}"></button>`;
-  return `<div class="sec"><h2>About you</h2><button class="link tap" data-a="setupOpen">${t?'Edit':'Set up'}</button></div>
-  <section class="card">${t?`<div class="kv-grid">
-    <div class="kv"><div class="k">Experience</div><div class="v" style="font-size:15px">${L.exp[t.exp]||'—'}</div></div>
-    <div class="kv"><div class="k">Goal</div><div class="v" style="font-size:15px">${L.goal[t.goal]||'—'}</div></div>
-    <div class="kv"><div class="k">How hard you train</div><div class="v" style="font-size:15px">${L.effort[t.effort]||'—'}</div></div>
-    <div class="kv"><div class="k">Trains at</div><div class="v" style="font-size:15px">${L.where[t.where]||'—'} · ${t.mins||60} min</div></div></div>
-    ${t.protect?`<div class="sm"><span class="muted">Protect:</span> ${esc(t.protect)}</div>`:''}`:`<p class="muted" style="margin:0">Answer a few quick questions so targets and Coach fit you.</p><button class="btn btn-primary btn-sm tap" data-a="setupOpen">Set up</button>`}</section>
-  <div class="sec"><h2>Your plan</h2></div>
-  <section class="card" style="gap:12px">
-   <div class="plan-now"><b>${ph.key==='block'?`Week ${ph.wk} of ${ph.len}`:ph.key==='deload'?'Easy week':'Same every week'}</b>
-    <span>${ph.key==='deload'?'Lighter weights and fewer sets so your body recovers. Next week you start fresh.':ph.key==='steady'?'Stop each set when you have 1–2 reps left in you.':`Stop each set when you have about ${ph.rir} rep${ph.rir===1?'':'s'} left in you.${ph.len-ph.wk>0?` Easy week in ${ph.len-ph.wk+1} weeks.`:' Easy week next week.'}`}</span></div>
-   <div><div class="flabel">How should your weeks go?</div><div class="optgrid col">
-    <button class="opt2 tap ${p.mode==='block'?'on':''}" data-a="progMode" data-v="block"><b>Build up (recommended)</b><span>A bit harder each week, then an easy week to rest and grow</span></button>
-    <button class="opt2 tap ${p.mode==='steady'?'on':''}" data-a="progMode" data-v="steady"><b>Keep it the same</b><span>Same effort every week, no easy weeks</span></button></div></div>
-   ${p.mode==='block'?`<div class="set-line"><div class="sl-t"><span>Hard weeks before a rest</span><span class="faint">Then one easy week</span></div><div class="seg" role="group" aria-label="Hard weeks before an easy week">${[4,5,6].map(n=>`<button class="tap" aria-pressed="${p.len===n}" data-a="progLenSet" data-v="${n}">${n}</button>`).join('')}</div></div>
-   <div class="row wrap" style="gap:8px">${ph.key!=='deload'?`<button class="btn btn-ghost btn-sm tap" data-a="progEasy">Feeling worn out? Easy week now</button>`:''}<button class="btn btn-ghost btn-sm tap" data-a="progRestart">Start again from week 1</button></div>`:''}
-   <div><div class="flabel">Muscles you want to grow most</div><div class="mchips">${VGROUPS.map(m=>`<button class="chip tap" aria-pressed="${p.priority.includes(m)}" data-a="progPrio" data-m="${m}">${m}</button>`).join('')}</div>
-    <div class="faint" style="font-size:12px;margin-top:6px">${p.priority.length?`${esc(p.priority.join(' and '))} ${p.priority.length>1?'go':'goes'} first and ${p.priority.length>1?'get':'gets'} extra sets.`:'Pick up to 2, or none to train everything evenly.'}</div></div>
-   <div class="set-line"><div class="sl-t"><span>All-out sets on barbells &amp; dumbbells</span><span class="faint">Off is safer: only machines and cables go to the very last rep</span></div>${sw('progFailFree',p.failureFree,'All-out sets on barbells and dumbbells')}</div>
-   <div class="set-line"><div class="sl-t"><span>Food tips</span><span class="faint">How much protein to eat, on the Weight tab</span></div>${sw('nutriToggle',nutriOn(),'Food tips')}</div>
-  </section>`;
-}
-function coachSettings(){
-  const c=C(), k=getKey(), ks=ui.keyStatus;
-  const sw=(a,on,label)=>`<button class="sw tap" role="switch" aria-checked="${on}" aria-label="${label}" data-a="${a}"></button>`;
-  return `<div class="sec" id="coach-settings"><h2>AI Coach</h2>${k?`<span class="badge">Key saved</span>`:''}</div>
-  <section class="card" style="gap:10px">
-   <div class="sl-t" style="flex:none"><span style="font-weight:600">Who coaches your sets</span><span class="faint">Flowfit logs the app’s and the AI’s call on every set either way, so the built-in coach keeps learning.</span></div>
-   <div class="mode-opts" role="group" aria-label="Coach mode">${[['ai','AI','AI decides every set'],['hybrid','Hybrid','App decides, AI for unusual sets'],['builtin','Built-in','No AI. Works offline']].map(([v,l,d])=>`<button class="tap" aria-pressed="${coachMode()===v}" data-a="setCoachMode" data-v="${v}"><b>${l}</b><span>${d}</span></button>`).join('')}</div>
-   ${coachMode()!=='builtin'&&!(c.on&&k)?`<span class="sm c-orange">AI needs Coach on and a key below. Until then the built-in coach runs everything.</span>`:''}
-   <div class="set-line"><span>AI Coach</span>${sw('coachToggle',c.on,'AI Coach on or off')}</div>
-   <div class="faint" style="font-size:12px;margin-top:-6px;line-height:1.5">${c.on?(k?'On: Coach plans your sets when you start and decides each next set. The app’s rules step in if Coach is slow or offline.':'On, but needs your Groq or Claude key below. Until then the app’s rules run everything.'):'Off: the app’s own rules set targets and adjust every set. Works offline.'}</div>
-   ${c.on?`<div><label class="flabel" for="gkey">Groq or Claude API key</label><div class="row"><input id="gkey" class="field grow" type="${ui.showKey?'text':'password'}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="gsk_… or sk-ant-…" value="${esc(k)}"><button class="sq tap" data-a="keyShow" aria-label="${ui.showKey?'Hide key':'Show key'}">${I('eye',18)}</button></div></div>
-   <div class="row wrap"><button class="btn btn-primary btn-sm tap" data-a="keySave">Save key</button><button class="btn btn-ghost btn-sm tap" data-a="keyTest" ${k&&!(ks&&ks.kind==='busy')?'':'disabled'}>${ks&&ks.kind==='busy'?'Testing…':'Test key'}</button></div>
-   ${ks&&ks.msg?`<span class="sm ${ks.kind==='ok'?'c-lime':ks.kind==='err'?'c-danger':'muted'}">${esc(ks.msg)}</span>`:''}
-   <div class="set-line"><div class="sl-t"><span>Coach brain</span><span class="faint">Smart thinks better. Fast replies quicker.</span></div><div class="seg" role="group"><button class="tap" aria-pressed="${c.model==='smart'}" data-a="coachModel" data-v="smart">Smart</button><button class="tap" aria-pressed="${c.model==='fast'}" data-a="coachModel" data-v="fast">Fast</button></div></div>
-   <div class="set-line"><div class="sl-t"><span>Share my weight with Coach</span><span class="faint">Helps Coach judge your food and progress</span></div>${sw('coachBody',c.body,'Share my weight with Coach')}</div>
-   ${k?(ui.confirm==='rmkey'?`<p class="err">Remove the key? Saved Coach answers and the chat are cleared too.</p><div class="row"><button class="btn btn-sm tap" style="background:var(--danger);color:#fff" data-a="rmKey">Remove key</button><button class="btn btn-ghost btn-sm tap" data-a="cancelConfirm">Keep</button></div>`:`<div><button class="link danger tap" data-a="askRmKey">Remove key</button></div>`):''}
-   <p class="faint" style="margin:0;font-size:12px;line-height:1.5">Get a free key at console.groq.com, or use a Claude key from console.anthropic.com. Coach sends a short summary of your training to ${PROV()} only when you tap a Coach button. Your key stays on this device and is never included in backups.${inFrame?' This web preview can’t connect to ${PROV()}; Coach works once the app runs on your phone.':''}</p>`:''}
-   ${(S.coachLog||[]).length?`<button class="btn btn-line btn-block tap" data-a="openLog">${I('chat',17)} Coach history (${S.coachLog.length})</button>`:''}
-  </section>`;
-}
+const SWITCH=(a,on,label)=>`<button class="sw tap" role="switch" aria-checked="${on}" aria-label="${label}" data-a="${a}"></button>`;
+const SEG=(key,val,opts)=>`<div class="seg" role="group">${opts.map(o=>`<button class="tap" aria-pressed="${val===o}" data-a="setting" data-k="${key}" data-v="${o}">${o}</button>`).join('')}</div>`;
+/* one settings row: title + optional one-line hint on the left, a control (or a chevron when the row opens something) on the right */
+const LI=(title,sub,right)=>`<div class="li"><div class="lt"><b>${title}</b>${sub?`<span>${sub}</span>`:''}</div>${right||''}</div>`;
+const LINK=(a,title,sub,val)=>`<button class="li tap" data-a="${a}"><div class="lt"><b>${title}</b>${sub?`<span>${sub}</span>`:''}</div><span class="lv">${val||''}${I('chevR',16)}</span></button>`;
+const TRAIN_L={exp:{new:'Under 6 months',mid:'6–24 months',adv:'2+ years'},goal:{muscle:'Build muscle',strength:'Get stronger',both:'Muscle and strength',cut:'Lose fat, keep strength',recomp:'Lean and fit'},effort:{easy:'Takes it easy',close:'Close to the limit',failure:'All-out often'},where:{gym:'Full gym',machines:'Mostly machines',home:'Home, dumbbells'}};
+function phaseShort(ph){return ph.key==='block'?`Week ${ph.wk} of ${ph.len} · ${ph.len-ph.wk>0?`easy week in ${ph.len-ph.wk+1} weeks`:'easy week next'}`:ph.key==='deload'?'Easy week now':'Same effort every week'}
+function stepper(a,k,val,unit,step,label){return `<div class="mini-step"><button class="tap" data-a="${a}" data-d="${-step}" aria-label="Less ${label}">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="${k}" value="${val}" aria-label="${label}"><span>${unit}</span></label><button class="tap" data-a="${a}" data-d="${step}" aria-label="More ${label}">${I('plus',16)}</button></div>`}
 function viewProfile(){
-  const p=S.profile, w=curWeight(), t=todayISO(), st=streaks();
+  const p=S.profile, w=curWeight(), t=todayISO(), st=streaks(), tr=p.train, pg=prog(), ph=phaseNow(), c=C(), k=getKey();
   const bmi=w&&p.height?w/((p.height/100)**2):null;
-  const cat=!bmi?'':bmi<18.5?'Underweight':bmi<25?'Normal':bmi<30?'Overweight':'Obese';
   const bestVol=S.sessions.reduce((m,s)=>Math.max(m,sessVol(s)),0);
   const n30=S.sessions.filter(s=>diffDays(s.date,t)<30&&s.date<=t).length;
   const c30=Math.min(100,Math.round(n30/(p.freq*30/7)*100));
-  const y0=`${t.slice(0,4)}-01-01`, nY=S.sessions.filter(s=>s.date>=y0).length, weeksY=Math.max(1,(diffDays(y0,t)+1)/7);
-  const cY=Math.min(100,Math.round(nY/(p.freq*weeksY)*100));
-  const days30=Array.from({length:30},(_,k)=>S.sessions.some(s=>s.date===addDays(t,k-29)));
-  const hasDemo=S.sessions.some(s=>s.demo)||p.weights.some(x=>x.demo);
-  const seg=(key,val,opts)=>`<div class="seg" role="group">${opts.map(o=>`<button class="tap" aria-pressed="${val===o}" data-a="setting" data-k="${key}" data-v="${o}">${o}</button>`).join('')}</div>`;
+  const about=tr?[TRAIN_L.goal[tr.goal],TRAIN_L.exp[tr.exp],TRAIN_L.where[tr.where]&&`${TRAIN_L.where[tr.where]}, ${tr.mins||60} min`].filter(Boolean).join(' · '):'Answer a few questions so targets fit you';
+  const coachSub=!c.on?'Off: the built-in coach runs everything':k?`Key saved · ${c.model==='fast'?'Fast':'Smart'} brain`:'Add a free Groq or Claude key';
   return `<div class="prof"><div class="brand-tile lg" aria-hidden="true">${logoMark(43)}</div><div class="grow"><div class="sm muted">Training ${p.freq}× a week</div><h1>${esc(p.name||'Athlete')}</h1></div><button class="icon-round tap" data-a="editProfile" aria-label="Edit profile">${I('pencil',18)}</button></div>
-  <div class="sec"><h2>Body</h2>${cat?`<span class="badge">${cat}</span>`:''}</div>
+
   <section class="card">
-   <div class="kv-grid">
-    <div class="kv"><div class="k"><span class="c-orange">${I('scale',14)}</span>Weight</div><div class="v">${w!=null?fmtW(w)+' '+U():'—'}</div></div>
-    <div class="kv"><div class="k"><span class="c-lime">${I('activity',14)}</span>BMI</div><div class="v">${bmi?bmi.toFixed(1):'—'}</div></div>
-    <div class="kv"><div class="k"><span class="c-teal">${I('ruler',14)}</span>Height</div><div class="v">${p.height} cm</div></div>
-    <div class="kv"><div class="k"><span class="c-violet">${I('cake',14)}</span>Age</div><div class="v">${p.age}</div></div></div>
-   <div class="row"><input id="wLog" class="field grow" inputmode="decimal" data-num="dec" enterkeyhint="done" value="${w!=null?fmtW(w):''}" aria-label="Today's weight in ${U()}"><button class="btn btn-primary tap" style="flex:none" data-a="logWeight">Log weight</button></div></section>
-  <div class="grid2">
-   <section class="tile"><div class="top">Streak<span class="c-orange">${I('flame',18)}</span></div><div class="v">${st.cur}<small>best ${st.best}</small></div><span class="faint" style="font-size:11px">Up to 2 rest days between workouts</span></section>
-   <section class="tile"><div class="top">Best volume<span class="c-lime">${I('trophy',18)}</span></div><div class="v">${fmtVol(bestVol)}<small>${U()}</small></div><span class="faint" style="font-size:11px">Most moved in one workout</span></section>
-   <section class="tile"><div class="top">30-day<span class="c-teal">${I('calendar',18)}</span></div><div class="v">${c30}%<small>done</small></div><div class="minibars" style="height:26px;gap:2px">${days30.map(x=>`<i class="${x?'on':''}" style="height:${x?100:25}%"></i>`).join('')}</div></section>
-   <section class="tile"><div class="top">This year<span class="c-violet">${I('target',18)}</span></div><div class="v">${cY}%<small>done</small></div><div class="segs">${[0,1,2,3,4,5,6,7,8,9].map(k=>`<i class="${cY>=(k+1)*10?'on':''}"></i>`).join('')}</div></section></div>
-  <div class="sec"><h2>Settings</h2></div>
-  <section class="card set-card">
-   <div class="set-grp">Workout</div>
-   <div class="set-line"><div class="sl-t"><span>Units</span><span class="faint">For every weight in the app</span></div>${seg('unit',S.settings.unit,['kg','lb'])}</div>
-   <div class="set-line"><div class="sl-t"><span>Workouts per week</span><span class="faint">Sets your weekly targets</span></div><div class="mini-step"><button class="tap" data-a="freq" data-d="-1" aria-label="Fewer per week">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="freq" value="${p.freq}" aria-label="Workouts per week"><span>×</span></label><button class="tap" data-a="freq" data-d="1" aria-label="More per week">${I('plus',16)}</button></div></div>
-   <div class="set-line"><div class="sl-t"><span>Rest between sets</span><span class="faint">Default for new exercises. Flowfit learns your best rest per exercise.</span></div><div class="mini-step"><button class="tap" data-a="restDef" data-d="-15" aria-label="Shorter rest">${I('minus',16)}</button><label class="ms-in"><input class="tn" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" autocomplete="off" data-num="int" data-c="msSet" data-k="rest" value="${S.settings.rest}" aria-label="Rest in seconds"><span>s</span></label><button class="tap" data-a="restDef" data-d="15" aria-label="Longer rest">${I('plus',16)}</button></div></div>
-   <div class="set-line"><div class="sl-t"><span>Exercise pictures</span><span class="faint">Shows how to do each move (needs internet)</span></div><button class="sw tap" role="switch" aria-checked="${guidesOn()}" aria-label="Exercise pictures" data-a="guidesToggle"></button></div>
-   <div class="set-grp">Look</div>
-   <div class="set-line"><span>Appearance</span>${seg('theme',S.settings.theme,['auto','dark','light'])}</div>
-   <div class="set-grp">Sync and updates</div>
+   <div class="body4">
+    <div><div class="k">Weight</div><div class="v">${w!=null?fmtW(w):'—'}<small>${U()}</small></div></div>
+    <div><div class="k">BMI</div><div class="v">${bmi?bmi.toFixed(1):'—'}</div></div>
+    <div><div class="k">Height</div><div class="v">${p.height}<small>cm</small></div></div>
+    <div><div class="k">Age</div><div class="v">${p.age}</div></div></div>
+   <div class="row"><input id="wLog" class="field grow" inputmode="decimal" data-num="dec" enterkeyhint="done" value="${w!=null?fmtW(w):''}" aria-label="Today's weight in ${U()}"><button class="btn btn-primary tap" style="flex:none" data-a="logWeight">Log weight</button></div>
+   <div class="stats3">
+    <div class="stat"><div class="k">Streak</div><div class="v">${st.cur}<small> best ${st.best}</small></div></div>
+    <div class="stat"><div class="k">30 days</div><div class="v">${c30}%</div></div>
+    <div class="stat"><div class="k">Top day</div><div class="v">${fmtVol(bestVol)}<small> ${U()}</small></div></div></div>
+  </section>
+
+  <div class="sec"><h2>Training</h2></div>
+  <section class="grp">
+   ${LINK('setupOpen','About you',esc(about)+(tr&&tr.protect?`<br>Protect: ${esc(tr.protect)}`:''),tr?'':'Set up')}
+   ${LI('Workouts per week','Sets your weekly targets',stepper('freq','freq',p.freq,'×',1,'workouts per week'))}
+   ${LINK('openPlanSet','Plan',esc(phaseShort(ph)))}
+   <div class="li col"><div class="lt"><b>Muscles to grow most</b><span>${pg.priority.length?`${esc(pg.priority.join(' and '))} ${pg.priority.length>1?'go':'goes'} first and ${pg.priority.length>1?'get':'gets'} extra sets`:'Pick up to 2, or none to train evenly'}</span></div><div class="mchips">${VGROUPS.map(m=>`<button class="chip tap" aria-pressed="${pg.priority.includes(m)}" data-a="progPrio" data-m="${m}">${m}</button>`).join('')}</div></div>
+   ${LI('Rest between sets','Starting point. Flowfit learns each exercise',stepper('restDef','rest',S.settings.rest,'s',15,'rest in seconds'))}
+   ${LI('Food tips','Protein to eat, on the Weight tab',SWITCH('nutriToggle',nutriOn(),'Food tips'))}
+  </section>
+
+  <div class="sec" id="coach-settings"><h2>Coach</h2></div>
+  <section class="grp">
+   <div class="li col"><div class="lt"><b>Who coaches your sets</b><span>Both calls are logged either way, so the built-in coach keeps learning</span></div>
+    <div class="mode-opts" role="group" aria-label="Coach mode">${[['ai','AI','Every set'],['hybrid','Hybrid','AI for unusual sets'],['builtin','Built-in','No AI, offline']].map(([v,l,d])=>`<button class="tap" aria-pressed="${coachMode()===v}" data-a="setCoachMode" data-v="${v}"><b>${l}</b><span>${d}</span></button>`).join('')}</div>
+    ${coachMode()!=='builtin'&&!(c.on&&k)?`<span class="sm c-orange">AI needs Coach on and a key. Until then the built-in coach runs everything.</span>`:''}</div>
+   ${LINK('openCoachSet','AI key and settings',esc(coachSub))}
+   ${(S.coachLog||[]).length?LINK('openLog','Coach history','',`${S.coachLog.length}`):''}
+  </section>
+
+  <div class="sec"><h2>App</h2></div>
+  <section class="grp">
+   ${LI('Units','',SEG('unit',S.settings.unit,['kg','lb']))}
+   ${LI('Appearance','',SEG('theme',S.settings.theme,['auto','dark','light']))}
+   ${LI('Exercise pictures','Needs internet',SWITCH('guidesToggle',guidesOn(),'Exercise pictures'))}
+  </section>
+
+  <div class="sec"><h2>Data</h2></div>
+  <section class="grp">
    ${sheetLine()}
    ${updLine()}
-  </section>
-  ${trainingCards()}
-  ${coachSettings()}
-  <div class="sec"><h2>Your data</h2></div>
-  <section class="card"><p class="muted" style="margin:0;line-height:1.5">Saved on this device. A backup has everything: your plan, every set, weigh-ins, and every question you asked Coach with its answer. Your API key is never included.</p>
-   <div class="row wrap"><button class="btn btn-ghost btn-sm tap" data-a="saveBackupFile">${I('download',17)} Save backup file</button><button class="btn btn-ghost btn-sm tap" data-a="copyBackup">${I('copy',17)} Copy backup</button><button class="btn btn-ghost btn-sm tap" data-a="openRestore">${I('upload',17)} Restore</button></div>
-   <div>${hasDemo?`<button class="btn btn-ghost btn-sm tap" data-a="clearDemo">Remove sample history</button>`:`<button class="btn btn-ghost btn-sm tap" data-a="loadDemo">Load 6 weeks of sample history</button>`}</div>
-   ${ui.resetArm?`<p class="err">This deletes your plan, every workout and all weigh-ins.</p><div class="row"><button class="btn btn-sm tap" style="background:var(--danger);color:#fff" data-a="reset">Delete everything</button><button class="btn btn-ghost btn-sm tap" data-a="resetCancel">Cancel</button></div>`:`<div><button class="link danger tap" data-a="resetArm">Reset all data</button></div>`}
+   ${LINK('openDataSet','Backup and restore','Everything except your API key')}
   </section>`;
 }
-
 /* ---------- sheets ---------- */
 const sheetHead=(eye,title,back)=>`<div class="sheet-head"><div class="sheet-grab"></div>${back?`<button class="sq tap" data-a="${back}" aria-label="Back">${I('chevL')}</button>`:''}<div class="t"><span>${eye}</span><h2>${title}</h2></div><button class="sq tap" data-a="closeSheet" aria-label="Close">${I('x',18)}</button></div>`;
 const SHEETS={
+  planset(){
+    const p=prog(), ph=phaseNow();
+    return sheetHead('Training','Plan')+`<div class="sheet-body">
+     <div class="plan-now"><b>${ph.key==='block'?`Week ${ph.wk} of ${ph.len}`:ph.key==='deload'?'Easy week':'Same every week'}</b>
+      <span>${ph.key==='deload'?'Lighter weights and fewer sets so your body recovers. Next week you start fresh.':ph.key==='steady'?'Stop each set when you have 1–2 reps left in you.':`Stop each set when you have about ${ph.rir} rep${ph.rir===1?'':'s'} left in you.`}</span></div>
+     <div><div class="flabel">How should your weeks go?</div><div class="optgrid col">
+      <button class="opt2 tap ${p.mode==='block'?'on':''}" data-a="progMode" data-v="block"><b>Build up (recommended)</b><span>A bit harder each week, then an easy week to rest and grow</span></button>
+      <button class="opt2 tap ${p.mode==='steady'?'on':''}" data-a="progMode" data-v="steady"><b>Keep it the same</b><span>Same effort every week, no easy weeks</span></button></div></div>
+     <section class="grp flat">
+      ${p.mode==='block'?LI('Hard weeks before a rest','Then one easy week',`<div class="seg" role="group" aria-label="Hard weeks before an easy week">${[4,5,6].map(n=>`<button class="tap" aria-pressed="${p.len===n}" data-a="progLenSet" data-v="${n}">${n}</button>`).join('')}</div>`):''}
+      ${LI('All-out sets on barbells and dumbbells','Off is safer: only machines and cables go to the last rep',SWITCH('progFailFree',p.failureFree,'All-out sets on barbells and dumbbells'))}
+     </section>
+     ${p.mode==='block'?`<div class="row wrap" style="gap:8px">${ph.key!=='deload'?`<button class="btn btn-ghost btn-sm tap" data-a="progEasy">Worn out? Easy week now</button>`:''}<button class="btn btn-ghost btn-sm tap" data-a="progRestart">Start again from week 1</button></div>`:''}</div>`;
+  },
+  coachset(){
+    const c=C(), k=getKey(), ks=ui.keyStatus;
+    return sheetHead('Coach','AI key and settings')+`<div class="sheet-body">
+     <section class="grp flat">${LI('AI Coach',c.on?(k?'Plans your sets and decides each next one':'On, but needs a key'):'Off: the app’s own rules run everything',SWITCH('coachToggle',c.on,'AI Coach on or off'))}</section>
+     ${c.on?`<div><label class="flabel" for="gkey">Groq or Claude API key</label><div class="row"><input id="gkey" class="field grow" type="${ui.showKey?'text':'password'}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="gsk_… or sk-ant-…" value="${esc(k)}"><button class="sq tap" data-a="keyShow" aria-label="${ui.showKey?'Hide key':'Show key'}">${I('eye',18)}</button></div></div>
+     <div class="row"><button class="btn btn-primary btn-sm grow tap" data-a="keySave">Save key</button><button class="btn btn-ghost btn-sm grow tap" data-a="keyTest" ${k&&!(ks&&ks.kind==='busy')?'':'disabled'}>${ks&&ks.kind==='busy'?'Testing…':'Test key'}</button></div>
+     ${ks&&ks.msg?`<span class="sm ${ks.kind==='ok'?'c-lime':ks.kind==='err'?'c-danger':'muted'}">${esc(ks.msg)}</span>`:''}
+     <section class="grp flat">
+      ${LI('Coach brain','Smart thinks better, Fast replies quicker',`<div class="seg" role="group"><button class="tap" aria-pressed="${c.model==='smart'}" data-a="coachModel" data-v="smart">Smart</button><button class="tap" aria-pressed="${c.model==='fast'}" data-a="coachModel" data-v="fast">Fast</button></div>`)}
+      ${LI('Share my weight','Helps Coach judge food and progress',SWITCH('coachBody',c.body,'Share my weight with Coach'))}
+     </section>
+     ${k?(ui.confirm==='rmkey'?`<p class="err">Remove the key? Saved Coach answers and the chat are cleared too.</p><div class="row"><button class="btn btn-sm tap" style="background:var(--danger);color:#fff" data-a="rmKey">Remove key</button><button class="btn btn-ghost btn-sm tap" data-a="cancelConfirm">Keep</button></div>`:`<div><button class="link danger tap" data-a="askRmKey">Remove key</button></div>`):''}
+     <p class="faint" style="margin:0;font-size:12px;line-height:1.5">Free key at console.groq.com, or a Claude key from console.anthropic.com. Your key stays on this phone and is never in backups.</p>`:''}</div>`;
+  },
+  dataset(){
+    const hasDemo=S.sessions.some(s=>s.demo)||S.profile.weights.some(x=>x.demo);
+    return sheetHead('Data','Backup and restore')+`<div class="sheet-body">
+     <p class="muted" style="margin:0;line-height:1.5">Saved on this phone. A backup has your plan, every set, weigh-ins and every Coach answer. Your API key is never included.</p>
+     <section class="grp flat">
+      ${LINK('saveBackupFile','Save backup file','')}
+      ${LINK('copyBackup','Copy backup','')}
+      ${LINK('openRestore','Restore from a backup','')}
+      ${hasDemo?LINK('clearDemo','Remove sample history',''):LINK('loadDemo','Load sample history','6 weeks of made-up workouts')}
+     </section>
+     ${ui.resetArm?`<p class="err">This deletes your plan, every workout and all weigh-ins.</p><div class="row"><button class="btn btn-sm grow tap" style="background:var(--danger);color:#fff" data-a="reset">Delete everything</button><button class="btn btn-ghost btn-sm grow tap" data-a="resetCancel">Cancel</button></div>`:`<div><button class="link danger tap" data-a="resetArm">Reset all data</button></div>`}</div>`;
+  },
   import(){
     if(ui.imp==='paste') return sheetHead('Import plan','Paste your plan','impMenu')+`<div class="sheet-body">
       <textarea id="impText" class="field" placeholder="${esc(EXAMPLE)}" aria-label="Workout plan text">${esc(ui.importText)}</textarea>
@@ -2438,7 +2411,7 @@ async function checkUpdate(manual){
 function updLine(){
   const b=myBuild(), u=updInfo(), ready=updReady();
   const sub=ui.updBusy?'Checking…':ready?`Build ${u.latest} is ready. It downloads, then tap Install. Your data stays.`:b?`Build ${b}${u&&u.checked?' · up to date':''}`:'Test copy (not from GitHub)';
-  return `<div class="set-line"><div class="sl-t"><span>App version</span><span class="faint">${esc(sub)}</span></div>${ready?`<button class="btn btn-primary btn-sm tap" style="flex:none" data-a="updInstall">Update</button>`:`<button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="updCheck" ${ui.updBusy?'disabled':''}>Check</button>`}</div>`;
+  return LI('App version',esc(sub),ready?`<button class="btn btn-primary btn-sm tap" style="flex:none" data-a="updInstall">Update</button>`:`<button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="updCheck" ${ui.updBusy?'disabled':''}>Check</button>`);
 }
 /* index to move an exercise to when its machine is busy: right after the next one you haven't finished */
 function nextOpenAfter(i){const a=S.active;if(!a)return 0;for(let k=i+1;k<a.exercises.length;k++){const x=a.exercises[k];if(!x.skipped&&x.sets.some(s=>!s.done))return k}return 0}
@@ -2598,7 +2571,7 @@ async function syncSheets(all,manual){
 function sheetLine(){
   const u=sheetUrl(), y=SY(), p=u?pendingRows(false).n:0;
   const sub=!u?'Send every workout, set, target and Coach answer to your own sheet':ui.syncing?'Syncing…':ui.syncErr?`Last try failed: ${ui.syncErr}`:p?`${p} row${p>1?'s':''} waiting${y.last?` · last sync ${fmtD(iso(new Date(y.last)))} ${hhmm(y.last)}`:''}`:y.last?`All synced · ${fmtD(iso(new Date(y.last)))} ${hhmm(y.last)}`:'Connected';
-  return `<div class="set-line"><div class="sl-t"><span>Google Sheets</span><span class="faint">${esc(sub)}</span></div><button class="btn btn-ghost btn-sm tap" style="flex:none" data-a="openSheetSync">${u?'Manage':'Connect'}</button></div>`;
+  return LINK('openSheetSync','Google Sheets',esc(sub),u?'':'Connect');
 }
 function setInc(name,v){incs()[stepKey(name)]=fromDisp(v);refreshDraft();closeSheet();render();buzz(15);toast(`${name}: goes up in ${v} ${U()} steps`)}
 function openSheet(name){
@@ -2671,6 +2644,7 @@ const TABS=[['workout','home','Home'],['plan','plan','Plan'],['progress','chart'
 function buildNav(){$('#nav').innerHTML=`<div class="navbar">${TABS.map(([v,ic,l])=>`<button class="tap" data-a="nav" data-v="${v}" aria-label="${l}">${I(ic,22)}<span>${l}</span></button>`).join('')}</div>`}
 function updateNav(){document.querySelectorAll('.navbar button').forEach(b=>{if(b.dataset.v===ui.view)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')})}
 let lastView=null;
+const LIVE_SHEETS=['planset','coachset','dataset'];
 function render(){
   sync(); applyTheme();
   if(guidesOn()&&!render.mq){render.mq=true;setTimeout(()=>{render.mq=false;const names=[...new Set([...(S.active?S.active.exercises.map(e=>e.name):[]),...S.plan.flatMap(d=>d.exercises.map(e=>e.name))])].filter(n=>!FEDB||!M()[mkey(n)]);if(names.length)ensureMatches(names)},400)}
@@ -2678,11 +2652,11 @@ function render(){
   const main=$('#main'), html=V[ui.view]();
   if(lastView!==ui.view){
     main.innerHTML=html; main.classList.remove('enter'); void main.offsetWidth;
-    [...main.children].forEach((c,i)=>c.style.setProperty('--i',Math.min(i,10)));
-    main.classList.add('enter'); clearTimeout(render.t); render.t=setTimeout(()=>main.classList.remove('enter'),1400);
+    main.classList.add('enter'); clearTimeout(render.t); render.t=setTimeout(()=>main.classList.remove('enter'),1300);
     lastView=ui.view;
   } else patch(main,html);
   updateNav(); renderDock(); save();
+  if(ui.sheet&&LIVE_SHEETS.includes(ui.sheet)){const sh=$('#sheetRoot .sheet');if(sh)patch(sh,SHEETS[ui.sheet]())}
   if(ui.view==='progress'&&ui.ptab==='overview'&&coachReady()&&online()){const l=latestSession();if(l&&!reportFor()&&!ui.busy.report&&!ui.cerr.report&&ui.reportTried!==l.id){ui.reportTried=l.id;setTimeout(runReport,60)}}
 }
 function renderDock(){
@@ -2799,7 +2773,6 @@ const act={
     refreshDraft();closeSheet();ui.parsed=null;ui.importText='';ui.view='plan';try{history.replaceState(null,'','#plan')}catch(e){}
     render();buzz([15,40,25]);toast(`Imported ${days.length} day${days.length>1?'s':''}`,()=>{S.plan=JSON.parse(snap);refreshDraft();render()});
   },
-  progSearch(){ui.progSearch=!ui.progSearch;ui.query='';render();if(ui.progSearch)setTimeout(()=>$('#exSearch')?.focus(),30)},
   progEx(d){ui.progEx=d.n;render()},
   editProfile(){openSheet('profile')},
   saveProfile(){const n=$('#pName').value.trim(),h=parseInt($('#pH').value,10),a=parseInt($('#pA').value,10),err=$('#pErr');
@@ -2827,6 +2800,9 @@ const act={
   shOff(){try{localStorage.removeItem(SHK)}catch(e){}S.sync={};ui.syncErr=null;closeSheet();render();toast('Disconnected from Google Sheets')},
   updInstall(){const u=updInfo();if(!u||!u.url)return;buzz(15);toast('Downloading. Open the file when it finishes, then tap Install');setTimeout(()=>{if(isNative())location.href=u.url;else window.open(u.url,'_blank')},400)},
   openLog(){openSheet('coachlog')},
+  openPlanSet(){openSheet('planset')},
+  openCoachSet(){openSheet('coachset')},
+  openDataSet(){ui.resetArm=false;openSheet('dataset')},
   openRestore(){openSheet('restore')},
   pickBackup(){const f=$('#bkIn');if(f){f.value='';f.click()}},
   restore(){const err=$('#rsErr');try{const o=JSON.parse($('#rsText').value);if(!o||o.v!==1||!Array.isArray(o.plan)||!Array.isArray(o.sessions))throw 0;if(o.activeWorkout&&!o.active)o.active=o.activeWorkout;delete o.activeWorkout;delete o.exportedAt;delete o.exportedFrom;S=o;save();Object.assign(ui,{curSet:{},restEnd:0,finish:null,dockOpen:false,planDay:0,sel:todayISO()});closeSheet();lastView=null;render();toast('Backup restored')}catch(e){err.textContent='That doesn’t look like a Flowfit backup. Paste the full text you copied.';err.hidden=false}},
@@ -2867,7 +2843,6 @@ const act={
   setupLater(){S.profile.trainSkip=true;closeSheet()},
   progMode(d){prog().mode=d.v;if(d.v==='block')prog().anchor=weekStart(todayISO());refreshDraft();render()},
   progLenSet(d){prog().len=+d.v;refreshDraft();render()},
-  progLen(d){const p=prog();p.len=clamp((p.len|0)+(+d.d),3,8);refreshDraft();render()},
   progEasy(){const p=prog();p.anchor=addDays(weekStart(todayISO()),-7*p.len);refreshDraft();render();toast('Easy week starts now')},
   progPrio(d){const l=prog().priority,i=l.indexOf(d.m);if(i>=0)l.splice(i,1);else{if(l.length>=2)l.shift();l.push(d.m)}buzz(8);refreshDraft();render()},
   nutriToggle(){S.settings.nutri=!nutriOn();render()},
@@ -2885,7 +2860,7 @@ const act={
   prange(d){ui.range=d.v;render()},
   openLift(d){ui.progEx=d.n;ui.ptab='strength';lastView=null;render();window.scrollTo(0,0)},
   openDay(d){ui.view='workout';ui.sel=d.d;try{history.replaceState(null,'','#workout')}catch(e){}render();setTimeout(()=>{const el=document.querySelector('#main .sec ~ .card[id^="s-"]');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},120)},
-  coachSetup(){if(ui.sheet)closeSheet();ui.view='profile';try{history.replaceState(null,'','#profile')}catch(e){}render();setTimeout(()=>{const el=$('#coach-settings');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});const k=$('#gkey');if(k&&!k.value)k.focus()},120)},
+  coachSetup(){if(ui.sheet)closeSheet();ui.view='profile';try{history.replaceState(null,'','#profile')}catch(e){}if(!C().on)C().on=true;render();setTimeout(()=>{openSheet('coachset');setTimeout(()=>{const k=$('#gkey');if(k&&!k.value)k.focus()},300)},120)},
   coachHidePrompt(){C().hidePrompt=true;render()},
   runCheckin(){runCheckin()},
   runFix(d){runFix(d.n)},
@@ -2901,8 +2876,6 @@ const act={
     else res=applyAction(a);
     a.state='applied';buzz(20);rerender();toast(res.msg,res.undo?()=>{res.undo();a.state=null;if(d.src==='review')C().review.sig=planSig();rerender()}:null)},
   coachDismiss(d){const list=actList(d.src),a=list&&list[+d.i];if(a&&!a.state){a.state='dismissed';rerender()}},
-  applyTarget(d){const a=S.active,e=a&&a.exercises[+d.i],t=targetsFor();if(!e||!t)return;const it=t.items.find(x=>x.exercise.toLowerCase()===e.name.toLowerCase());if(!it)return;
-    e.sets.forEach(x=>{if(!x.done){x.w=it.w;x.r=it.r}});buzz(15);render();bump('sw-'+e.id)},
   starEx(d){const e=S.plan[ui.planDay].exercises[+d.i];e.star=!e.star;buzz(10);render()},
   openChat(){openSheet('chat');setTimeout(()=>{scrollChat();const i=$('#chatIn');if(i)i.focus()},120)},
   chatSuggest(d){const i=$('#chatIn');if(i){i.value=d.q;act.chatSend()}},
@@ -3168,7 +3141,7 @@ setInterval(()=>{
     const c=document.querySelector('[data-tick="ring"]');if(c){const C=2*Math.PI*19;c.setAttribute('stroke-dashoffset',(C*(1-left/ui.restTotal)).toFixed(1))}}
 },1000);
 
-(()=>{const sp=$('#splash');if(!sp)return;sp.innerHTML=`<div class="sp-in">${logoMark(112)}<div class="sp-name">Flowfit</div></div>`;setTimeout(()=>sp.classList.add('out'),650);setTimeout(()=>sp.remove(),1100)})();
+(()=>{const sp=$('#splash');if(!sp)return;sp.innerHTML=logoMark(120);setTimeout(()=>sp.classList.add('out'),450);setTimeout(()=>sp.remove(),850)})();
 buildNav(); render();
 if(!S.profile.train&&!S.profile.trainSkip)setTimeout(()=>act.setupOpen(),600);
 </script>

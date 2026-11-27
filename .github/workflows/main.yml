@@ -37,6 +37,9 @@ jobs:
       - name: App icon and splash from assets/
         run: npx capacitor-assets generate --android
 
+      - name: Launch screen matches the in-app splash (sharp logo, same background)
+        run: python3 scripts/android-splash.py
+
       - name: Stamp the build number into the app (used by "Check for updates")
         run: echo "window.FLOWFIT_BUILD=${{ github.run_number }};window.FLOWFIT_SHA='${GITHUB_SHA::7}';" > www/build.js
 
